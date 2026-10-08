@@ -35,12 +35,23 @@ export function AdminNav({ role }: {
     return (<nav className="admin-nav" aria-label="Content Studio">
       {items.filter((item) => (!item.adminOnly || role === 'admin' || role === 'super_admin') && (!item.systemOnly || role === 'super_admin') && (!item.reviewerOnly || role === 'super_admin' || role === 'admin' || role === 'reviewer')).map((item) => {
             const active = item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href);
-            return (<Link key={item.href} href={item.href} className={active ? 'active' : undefined}>
+            return (<Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')} className={active ? 'active' : undefined}>
             <Icon name={item.icon} size={17}/>
             <span>{item.label}</span>
           </Link>);
         })}
-      <Link href="/settings"><Icon name="settings" size={17}/><span>Account</span></Link>
+      <Link href="/settings" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}><Icon name="settings" size={17}/><span>Account</span></Link>
     </nav>);
+}
+
+export function AdminMobileNav({ role }: { role: string }) {
+    return <details className="admin-mobile-drawer">
+      <summary aria-label="Open Content Studio navigation"><Icon name="menu" size={19}/></summary>
+      <button type="button" className="mobile-drawer-backdrop" aria-label="Close Content Studio navigation" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}/>
+      <nav className="admin-mobile-panel" aria-label="Content Studio pages">
+        <strong>Content Studio</strong>
+        <AdminNav role={role}/>
+      </nav>
+    </details>;
 }
 

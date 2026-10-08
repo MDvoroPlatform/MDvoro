@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/icons';
-import { PrimaryNav } from '@/components/layout/primary-nav';
+import { MobileNavDrawer, PrimaryNav } from '@/components/layout/primary-nav';
 import { LocaleSwitcher } from '@/components/i18n/locale-switcher';
 import { ThemeToggle } from '@/components/i18n/theme-toggle';
 import { getI18n } from '@/lib/i18n/server';
@@ -27,10 +27,13 @@ export async function AppShell({ children, userName, role, examLabel }: {
 
       <main className="main">
         <header className="topbar">
-          <div className="topbar-mobile-brand">
-            <Link href="/dashboard" className="brand brand-image" aria-label="MDvoro home">
-              <MDvoroLogo compact />
-            </Link>
+          <div className="topbar-mobile-controls">
+            <MobileNavDrawer staff={staff}/>
+            <div className="topbar-mobile-brand">
+              <Link href="/dashboard" className="brand brand-image" aria-label="MDvoro home">
+                <MDvoroLogo compact />
+              </Link>
+            </div>
           </div>
           <div className="topbar-search">
             <label className="search" aria-label={m.common.search}>

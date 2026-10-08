@@ -4,7 +4,7 @@ type IconProps = {
 };
 const base = (p: IconProps) => ({ width: p.size ?? 18, height: p.size ?? 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: p.stroke ?? 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true });
 export function Icon({ name, ...p }: IconProps & {
-    name: 'grid' | 'book' | 'cards' | 'calendar' | 'chart' | 'settings' | 'search' | 'bell' | 'arrow' | 'target' | 'brain' | 'check' | 'shield' | 'logout' | 'plus' | 'clock' | 'spark' | 'eye' | 'globe' | 'moon' | 'sun' | 'bookmark' | 'trophy';
+    name: 'grid' | 'book' | 'cards' | 'calendar' | 'chart' | 'settings' | 'search' | 'bell' | 'arrow' | 'target' | 'brain' | 'check' | 'shield' | 'logout' | 'plus' | 'clock' | 'spark' | 'eye' | 'globe' | 'moon' | 'sun' | 'bookmark' | 'trophy' | 'menu';
 }) {
     const a = base(p);
     const paths: Record<string, React.ReactNode> = {
@@ -26,6 +26,7 @@ export function Icon({ name, ...p }: IconProps & {
         clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
         bookmark: <><path d="M6 4.5A2.5 2.5 0 0 1 8.5 2h7A2.5 2.5 0 0 1 18 4.5V21l-6-3.5L6 21z"/></>,
         trophy: <><path d="M8 4h8v4a4 4 0 0 1-8 0z"/><path d="M8 6H4v2a4 4 0 0 0 4 4M16 6h4v2a4 4 0 0 1-4 4M12 12v5M8 21h8M9 17h6"/></>,
+        menu: <><path d="M4 6h16M4 12h16M4 18h16"/></>,
         spark: <><path d="m12 3 1.4 5.1L18 10l-4.6 1.9L12 17l-1.4-5.1L6 10l4.6-1.9z"/><path d="m19 16 .6 2.2L22 19l-2.4.8L19 22l-.6-2.2L16 19l2.4-.8z"/></>,
         eye: <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="2.5"/></>,
         globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z"/></>,
