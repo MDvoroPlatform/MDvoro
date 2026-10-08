@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { loginSchema, signUpSchema } from '@/lib/validation/auth';
 import { useI18n } from '@/components/i18n/provider';
 import { Turnstile } from '@/components/auth/turnstile';
+import { isEmailSendRateLimitError } from '@/lib/auth/errors';
 
 const CAPTCHA_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
@@ -56,7 +57,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
                     },
                 });
                 if (result.error) {
-                    setError(m.auth.genericError);
+                    setError(isEmailSendRateLimitError(result.error) ? m.auth.emailRateLimited : m.auth.genericError);
                     return;
                 }
                 setCaptchaToken('');
