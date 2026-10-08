@@ -1,0 +1,5 @@
+import { createClient } from '@/lib/supabase/server';
+import { getI18n } from '@/lib/i18n/server';
+import { NotebookBrowser } from '@/components/library/notebook-browser';
+const title={en:['Personal notebook','My Notebook','A searchable home for the private notes you save while practicing.'],he:['מחברת אישית','המחברת שלי','כל ההערות הפרטיות שלך מתוך תרגול, במקום אחד.'],ar:['مذكرتي الشخصية','مذكرتي','مكان واحد قابل للبحث لكل ملاحظاتك الخاصة من التدريب.'],ru:['Личный блокнот','Мой блокнот','Все ваши личные заметки из практики — в одном месте.']} as const;
+export default async function NotebookPage(){const {locale}=await getI18n();const s=await createClient();const {data:{user}}=await s.auth.getUser();if(!user)return null;const {data}=await s.rpc('list_my_notebook',{p_limit:200});const t=title[locale];return <div className="page"><div className="page-head"><div><div className="eyebrow">{t[0]}</div><h1>{t[1]}</h1><p className="subtitle">{t[2]}</p></div></div><NotebookBrowser rows={(data??[]) as never[]}/></div>}

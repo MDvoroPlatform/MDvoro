@@ -1,0 +1,10 @@
+'use client';
+import Link from 'next/link';
+import { useI18n } from '@/components/i18n/provider';
+const copy={
+ en:{title:'Quick start',sub:'Start a useful session in one tap.',items:[['Smart 20','20 adaptive questions','mixed'],['Fix mistakes','Questions you previously missed','incorrect'],['Fresh questions','Questions you have not answered','unseen'],['Saved questions','Your marked questions','bookmarked'],['Full simulation','Official exam-sized session','full']]},
+ he:{title:'התחלה מהירה',sub:'התחל סשן שימושי בלחיצה אחת.',items:[['20 חכם','20 שאלות אדפטיביות','mixed'],['תיקון טעויות','שאלות שטעית בהן בעבר','incorrect'],['שאלות חדשות','שאלות שעדיין לא פתרת','unseen'],['שאלות שמורות','השאלות שסימנת','bookmarked'],['סימולציה מלאה','סשן בגודל הבחינה הרשמית','full']]},
+ ar:{title:'بداية سريعة',sub:'ابدأ جلسة مفيدة بلمسة واحدة.',items:[['20 ذكي','20 سؤالًا تكيفيًا','mixed'],['إصلاح الأخطاء','أسئلة أخطأت فيها سابقًا','incorrect'],['أسئلة جديدة','أسئلة لم تجب عنها بعد','unseen'],['الأسئلة المحفوظة','الأسئلة التي علّمتها','bookmarked'],['محاكاة كاملة','جلسة بحجم الامتحان الرسمي','full']]},
+ ru:{title:'Быстрый старт',sub:'Начните полезную сессию одним нажатием.',items:[['20 умных','20 адаптивных вопросов','mixed'],['Исправить ошибки','Вопросы, которые вы уже пропустили','incorrect'],['Новые вопросы','Вопросы, на которые вы не отвечали','unseen'],['Сохранённые','Ваши отмеченные вопросы','bookmarked'],['Полная симуляция','Сессия размера экзамена','full']]}
+} as const;
+export function QBankQuickStart({examId}:{examId?:string|null}){const {locale}=useI18n();const t=copy[locale];const suffix=examId?`&examId=${encodeURIComponent(examId)}`:'';return <section className="quick-start card card-pad"><div className="panel-head"><div><div className="panel-title">{t.title}</div><div className="panel-sub">{t.sub}</div></div></div><div className="quick-start-grid">{t.items.map(([title,text,pool])=><Link key={pool} href={pool==='full'?`/qbank?full=1${examId?`&examId=${encodeURIComponent(examId)}`:''}`:`/qbank?pool=${pool}${suffix}`} className="quick-start-item"><strong>{title}</strong><span>{text}</span></Link>)}</div></section>}

@@ -1,0 +1,56 @@
+{
+  "name": "mdvoro",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "security:audit": "npm audit --audit-level=high",
+    "security:audit:production": "npm audit --omit=dev --audit-level=high",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "provision:admin": "node scripts/provision-admin.mjs",
+    "check:quality": "node scripts/check-quality.mjs",
+    "check:production": "node scripts/check-production.mjs",
+    "check:hygiene": "node scripts/check-hygiene.mjs",
+    "check:db-contracts": "node scripts/check-db-contracts.mjs",
+    "verify": "npm run check:enterprise && npm run check:http && npm run check:rls && npm run check:db-contracts && npm run check:ts-parse && npm run check:sql && npm run check:architecture && npm run check:quality && npm run check:production && npm run check:hygiene && npm run check:learning && npm run check:qbank && npm run check:runtime && npm run check:ui && npm run security:audit:production && npm run lint && npm run typecheck && npm run test && npm run build",
+    "check:learning": "node scripts/check-learning-engine.mjs",
+    "check:enterprise": "node scripts/check-enterprise.mjs",
+    "check:http": "node scripts/check-http-contracts.mjs",
+    "check:rls": "node scripts/check-rls-source.mjs",
+    "check:ts-parse": "node scripts/check-ts-parse.mjs",
+    "check:sql": "node scripts/check-sql-structure.mjs",
+    "check:qbank": "node scripts/check-qbank-contract.mjs",
+    "check:runtime": "node scripts/check-runtime-contracts.mjs",
+    "load:test": "node scripts/load-test.mjs",
+    "check:ui": "node scripts/check-ui-contracts.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.117.3",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.9.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "9.38.0",
+    "eslint-config-next": "16.4.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=22.23.0 <25"
+  }
+}

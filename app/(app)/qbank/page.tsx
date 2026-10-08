@@ -1,0 +1,7 @@
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import { QBankConfigurator } from '@/components/qbank/qbank-configurator';
+import { QBankQuickStart } from '@/components/qbank/quick-start';
+import { getI18n } from '@/lib/i18n/server';
+type Exam={id:string;code:string;name:string};
+export default async function QBankPage({searchParams}:{searchParams:Promise<{examId?:string;pool?:string;full?:string}>}){const {messages:m}=await getI18n();const params=await searchParams;const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)return null;const [{data:exams},{data:profile}]=await Promise.all([supabase.from('exams').select('id,code,name').order('name'),supabase.from('profiles').select('active_exam_id').eq('id',user.id).maybeSingle()]);return <div className="page"><div className="page-head"><div><div className="eyebrow">{m.qbank.eyebrow}</div><h1>{m.qbank.title}</h1><p className="subtitle">{m.qbank.subtitle}</p></div><Link className="btn" href="/qbank/history">{m.qbank.history}</Link></div><QBankQuickStart examId={profile?.active_exam_id ?? null}/><QBankConfigurator exams={(exams??[]) as Exam[]} currentExamId={profile?.active_exam_id??null} initialExamId={params.examId??null} initialPool={(['mixed','unseen','incorrect','answered','unanswered','bookmarked'] as const).includes(params.pool as never)?(params.pool as 'mixed'|'unseen'|'incorrect'|'answered'|'unanswered'|'bookmarked'):undefined} fullExam={params.full==='1'}/></div>}

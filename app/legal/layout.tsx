@@ -1,0 +1,3 @@
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+export default function LegalLayout({children}:{children:ReactNode}){return <main className="legal-page"><header className="legal-header"><Link href="/dashboard" className="brand"><span className="brand-mark">MD</span><span className="brand-name">MD<span>voro</span></span></Link><nav><Link href="/legal/privacy">Privacy</Link><Link href="/legal/cookies">Cookies</Link><Link href="/legal/terms">Terms</Link><Link href="/legal/copyright">Copyright</Link><Link href="/legal/dmca">DMCA agent</Link><Link href="/legal/accessibility">Accessibility</Link></nav></header><article className="legal-card card card-pad">{children}</article></main>}
