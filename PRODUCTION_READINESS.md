@@ -32,7 +32,7 @@ Status reflects checks completed on 2026-10-08 against the checked-out source an
 | Deployment and domain | BLOCKED | No hosting account/project or verified production domain is connected. The local canonical origin is localhost; production environment values, deployed headers, backups/PITR, and recovery checks remain unverified. |
 | Initial operations/content | BLOCKED | No production administrator has been provisioned, and the database contains schema but no production question/exam content or user accounts. Provisioning needs the operator's account and content with rights. |
 | Legal/operator information | BLOCKED | Legal pages require the actual operator identity and contact information, plus review of privacy/vendor obligations; these facts cannot be invented. |
-| GitHub publication | BLOCKED | A local source commit exists, but `git push -u origin main` returned HTTP 403: GitHub denied write access to authenticated account `mdvoro` for `MDvoroPlatform/MDvoro`. No source was pushed. The latest read-only remote check could not connect through the configured proxy. |
+| GitHub publication | PASS | The verified source is published on `main` in `MDvoroPlatform/MDvoro`. Remote `refs/heads/main` was checked and matches local commit `de705725af1ad141e14efddfd7a8b805f69850d6`. No `.env.local` or service-role secret was committed. |
 
 ## Findings fixed during live testing
 
