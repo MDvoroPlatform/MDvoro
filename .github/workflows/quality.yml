@@ -8,6 +8,12 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-public-key
+      NEXT_PUBLIC_SITE_URL: https://mdvoro-ci.invalid
+      MDVORO_APP_ORIGIN: https://mdvoro-ci.invalid
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,3 +23,5 @@ jobs:
           test -f package-lock.json || (echo 'package-lock.json is required for deterministic CI.' && exit 1)
           npm ci --no-audit --no-fund
       - run: npm run verify
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:e2e -- --workers=1
