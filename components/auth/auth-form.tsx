@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { loginSchema, signUpSchema } from '@/lib/validation/auth';
 import { useI18n } from '@/components/i18n/provider';
@@ -9,6 +10,7 @@ import { Turnstile } from '@/components/auth/turnstile';
 const CAPTCHA_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
 export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
+    const router = useRouter();
     const { messages: m } = useI18n();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -73,7 +75,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
                     setError(m.auth.genericError);
                     return;
                 }
-                window.location.assign('/dashboard');
+                router.replace('/dashboard');
             }
         } catch {
             setError(m.auth.genericError);

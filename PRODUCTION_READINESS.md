@@ -8,12 +8,13 @@ Status reflects checks completed on 2026-10-08 against the checked-out source an
 - The restored source already contained the hardened MDvoro application, 43 database migrations, and local test/configuration documentation. `.env.local` contains the public Supabase project URL and publishable key and is ignored by Git; no service-role key or database password is required by the web application.
 - The correct Supabase project was verified as MDvoro Platform, ref `yqadaomiudllzujngbba`. All 45 source migrations have now been applied and are present in the remote migration history.
 - Applying migrations to real Postgres exposed runtime SQL defects that source checks had not detected. The migration sources were repaired, and two forward migrations were added: `0044_revoke_legacy_question_view.sql` removes an accidental read grant on the deprecated question view; `0045_restore_admin_mfa_gate.sql` restores AAL2 enforcement for admin and super-admin permissions.
+- The temporary Supabase PAT was exposed in the dashboard's creation dialog and has been revoked. Supabase confirmed that no access tokens remain. It was not committed to the repository.
 
 ## Verification status
 
 | Check | Status | Evidence / limitation |
 |---|---|---|
-| Supabase project connection | PASS | Supabase URL and publishable key point to the verified project; token was used transiently from the local clipboard and not saved in the repository. |
+| Supabase project connection | PASS | Local public URL/key point to the verified project. The temporary management token has since been revoked; it was not committed. |
 | Database schema and migration history | PASS | All 45 migrations applied; remote migration history verified through `0045_restore_admin_mfa_gate`. |
 | Production database contracts | PASS | `supabase/tests/production_db_contracts.sql` executed against the live project. |
 | Security function/RLS contracts | PASS | `supabase/tests/security_contracts.sql` and `supabase/tests/rls_core.sql` executed against the live project. |
@@ -23,11 +24,15 @@ Status reflects checks completed on 2026-10-08 against the checked-out source an
 | Flashcard and study-plan RPCs | PASS | Student create/review/delete, cross-account review/delete protection, study-plan upsert, and active-exam changes passed. |
 | Leaderboard privacy and concurrent writes | PASS | Student opt-out displayed as “Anonymous student”. Five distinct answer submissions plus five concurrent retries with the same idempotency key produced exactly six canonical attempts and matching question/exam/daily projections. |
 | Test-data cleanup | PASS | All disposable Auth users, exam/question fixtures, and dependent rows were removed; final check found zero test users and exams. |
-| Full source, lint, typecheck, unit tests, and build | PASS | `npm run verify` completed. Four Vitest files / seven tests passed; production build generated all 61 pages. ESLint reports 0 errors and 3 existing warnings. |
+| Full source, lint, typecheck, unit tests, and build | PASS | Latest `npm run verify` completed after the navigation/image cleanup. Four Vitest files / seven tests passed; ESLint reports 0 warnings/errors; production build generated all 61 pages. |
+| Browser smoke tests | PASS | `npm run test:e2e`: Chromium and mobile WebKit auth-entry smoke tests passed (2/2). These use local development configuration, not production Auth credentials. |
 | Production dependency audit | PASS | `npm audit --omit=dev --audit-level=high`: 0 vulnerabilities. |
 | Full dependency audit | PASS | `npm audit --audit-level=high`: 0 vulnerabilities, including development dependencies. |
-| Deployed application and external Auth settings | BLOCKED | No production hosting deployment or canonical production domain is configured/verified. Production Turnstile site/secret, SMTP and email verification, Auth redirect allowlist, production environment values, deployed response headers, backup/PITR, and recovery checks still need to be configured and verified. The Supabase project was initially empty and currently has schema but no production content/accounts. |
-| GitHub publication | BLOCKED | Local source commit `fd4ee9a` was created, but `git push -u origin main` returned HTTP 403: GitHub denied write access to the authenticated account `mdvoro` for `MDvoroPlatform/MDvoro`. No source was pushed. |
+| Supabase Auth configuration | BLOCKED | Dashboard shows site URL `http://localhost:3000` and no redirect URLs. Email signups and confirmation are enabled, but custom SMTP is disabled. MFA shows enabled and AAL1 session duration limiting is on. CAPTCHA status was not verified, and the local Turnstile site key is absent. |
+| Deployment and domain | BLOCKED | No hosting account/project or verified production domain is connected. The local canonical origin is localhost; production environment values, deployed headers, backups/PITR, and recovery checks remain unverified. |
+| Initial operations/content | BLOCKED | No production administrator has been provisioned, and the database contains schema but no production question/exam content or user accounts. Provisioning needs the operator's account and content with rights. |
+| Legal/operator information | BLOCKED | Legal pages require the actual operator identity and contact information, plus review of privacy/vendor obligations; these facts cannot be invented. |
+| GitHub publication | BLOCKED | A local source commit exists, but `git push -u origin main` returned HTTP 403: GitHub denied write access to authenticated account `mdvoro` for `MDvoroPlatform/MDvoro`. No source was pushed. The latest read-only remote check could not connect through the configured proxy. |
 
 ## Findings fixed during live testing
 
@@ -38,4 +43,4 @@ Status reflects checks completed on 2026-10-08 against the checked-out source an
 
 ## Release decision
 
-**MDvoro is not yet fully production-ready.** The live database authorization, isolation, admin MFA, and concurrency gates have passed, and no known dependency vulnerabilities remain. A real deployment cannot be called production-ready until the hosting target/domain and production environment are established, Supabase Auth CAPTCHA/SMTP/verification/redirect settings are configured, the initial administrator is provisioned with MFA, backups/recovery and deployed headers are verified, and the release is exercised against those production settings. Do not put real student records in this project before those remaining release gates are complete.
+**MDvoro is not yet fully production-ready.** The live database authorization, isolation, admin MFA, and concurrency gates have passed, and no known dependency vulnerabilities remain. Production use still requires a hosting target and verified domain, production environment values, CAPTCHA and SMTP configuration, Auth redirect URLs, initial admin and content provisioning, verified backups/recovery and deployed headers, and operator/legal details. The exposed temporary PAT has been revoked. Do not put real student records in this project before those remaining release gates are complete.

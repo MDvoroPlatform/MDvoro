@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -386,7 +387,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         <div className="card card-pad question-card">
           <div className="question-meta"><span>{question.subject}</span>{question.topic && <span>{question.topic}</span>}{question.reconstruction?.is_reconstruction && <span className="reconstruction-badge">{question.reconstruction.label} {question.reconstruction.year ?? ''}</span>}<span>{m.qbank.difficulty} {question.difficulty ?? '—'}/5</span></div>
           <div className="question-stem">{question.stem}</div>
-          {media.length > 0 && <div className="question-media">{media.map((asset) => asset.external_url ? <figure key={asset.id}><img src={asset.external_url} alt={asset.alt_text} loading="lazy" decoding="async" referrerPolicy="no-referrer"/><figcaption>{asset.caption}</figcaption></figure> : null)}</div>}
+          {media.length > 0 && <div className="question-media">{media.map((asset) => asset.external_url ? <figure key={asset.id}><Image src={asset.external_url} alt={asset.alt_text} width={1200} height={800} unoptimized loading="lazy" decoding="async" referrerPolicy="no-referrer"/><figcaption>{asset.caption}</figcaption></figure> : null)}</div>}
           <div className="answer-options">
             {question.options.map((option) => {
               const answered = question.answered;
