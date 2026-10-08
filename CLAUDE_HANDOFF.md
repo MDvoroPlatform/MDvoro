@@ -14,7 +14,7 @@ Do not restart MDvoro, redo the completed hardening, remove features, or claim f
 
 - Repository: `https://github.com/MDvoroPlatform/MDvoro`
 - Branch: `main`
-- Current `main` commit: `d3d8707e0294d1ebc43d8529faeb8b86959cc3ff` (`Update GitHub publication readiness`).
+- Current `main` commit: this handoff document's latest commit on `main`; inspect `git log -1` before continuing. At the time this document was first pushed, the source and readiness report were at `d3d8707e0294d1ebc43d8529faeb8b86959cc3ff` (`Update GitHub publication readiness`).
 - The application source commit immediately before the documentation-only readiness correction is `de705725af1ad141e14efddfd7a8b805f69850d6`.
 - At handoff, local `main` was clean and matched `origin/main`.
 - The repo is public. No `.env.local`, service-role key, database password, Supabase PAT, or other known secret was committed.
@@ -53,7 +53,7 @@ Do not restart MDvoro, redo the completed hardening, remove features, or claim f
 - `npm run test:e2e` passed 2/2 narrow auth-entry smoke tests (desktop Chromium and mobile WebKit). These are not a full end-to-end product suite and did not use production Auth credentials.
 - `npm audit --omit=dev --audit-level=high` found zero vulnerabilities.
 - `npm audit --audit-level=high` found zero vulnerabilities, including development dependencies.
-- The latest commit `d3d8707...` changes only the readiness report to record the successful GitHub publication. The source checks were not rerun after that documentation-only change.
+- Commit `d3d8707...` changed only the readiness report to record the successful GitHub publication. The subsequent handoff commits are documentation-only. Source checks were not rerun after documentation-only changes.
 
 ### GitHub publication
 
@@ -100,4 +100,4 @@ Do not restart MDvoro, redo the completed hardening, remove features, or claim f
 
 ## Suggested first prompt to Claude
 
-> Continue the existing MDvoro project from the current repository state. Read `CLAUDE_HANDOFF.md`, `PRODUCTION_READINESS.md`, `DEPLOYMENT.md`, and `ENVIRONMENT.md` first. Do not restart the project or redo completed hardening. The source is already on GitHub `main` at commit `d3d8707e0294d1ebc43d8529faeb8b86959cc3ff`; Supabase project `yqadaomiudllzujngbba` already has 45 migrations applied and the documented live RLS/admin/MFA/isolation/concurrency tests passed. First reconcile stale README/setup guidance with verified evidence and inspect the current worktree. Then complete every release gate that does not depend on a domain/hosting choice. The owner is nontechnical and wants the domain/public deployment later, so give simple Arabic instructions only when a specific owner action is unavoidable. Never expose or commit credentials. Do not claim production-ready until production hosting, Auth URLs/SMTP/CAPTCHA, operational recovery/monitoring, initial admin/content and deployed-flow checks are verified.
+> Continue the existing MDvoro project from the current repository state. Read `CLAUDE_HANDOFF.md`, `PRODUCTION_READINESS.md`, `DEPLOYMENT.md`, and `ENVIRONMENT.md` first. Do not restart the project or redo completed hardening. The source is already on GitHub `main`; inspect `git log -1` for the current commit. Supabase project `yqadaomiudllzujngbba` already has 45 migrations applied and the documented live RLS/admin/MFA/isolation/concurrency tests passed. First reconcile stale README/setup guidance with verified evidence and inspect the current worktree. Then complete every release gate that does not depend on a domain/hosting choice. The owner is nontechnical and wants the domain/public deployment later, so give simple Arabic instructions only when a specific owner action is unavoidable. Never expose or commit credentials. Do not claim production-ready until production hosting, Auth URLs/SMTP/CAPTCHA, operational recovery/monitoring, initial admin/content and deployed-flow checks are verified.
