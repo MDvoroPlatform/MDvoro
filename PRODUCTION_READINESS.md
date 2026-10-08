@@ -25,8 +25,8 @@ Status reflects database checks completed on 2026-10-08 and application/load che
 | Leaderboard privacy and concurrent writes | PASS | Student opt-out displayed as “Anonymous student”. Five distinct answer submissions plus five concurrent retries with the same idempotency key produced exactly six canonical attempts and matching question/exam/daily projections. |
 | Test-data cleanup | PASS | All disposable Auth users, exam/question fixtures, and dependent rows were removed; final check found zero test users and exams. |
 | Full source, lint, typecheck, unit tests, and build | PASS | `npm run verify` completed on 2026-10-09, including the CI placeholder environment. Static gates, ESLint, TypeScript, four Vitest files / seven tests, production dependency audit, and production build passed; build generated all 61 pages. |
-| Browser smoke and responsive tests | PASS | `npm run test:e2e -- --workers=1` with the CI placeholder environment: 4/4 tests passed across desktop Chromium and iPhone emulation, covering public/auth entry and responsive public/legal pages. These use local development configuration, not production Auth credentials. |
-| GitHub Actions configuration | UPDATED | CI now defines non-secret placeholder Supabase/origin/Turnstile values so build verification does not depend on a developer's `.env.local`; it installs Chromium/WebKit and runs browser tests after `npm run verify`. Local verification with these same values passed. Verify the triggered GitHub Actions run after push. |
+| Browser smoke and responsive tests | PASS | `npm run test:e2e -- --workers=1` against the optimized production server with a local Auth mock: 8/8 passed across Chromium and WebKit/iPhone emulation. Covers public/auth entry, responsive public/legal pages, anonymous redirects on protected student/admin pages, and 5 protected API routes returning 401. No production Auth accounts or data were used. |
+| GitHub Actions configuration | UPDATED | CI uses non-secret placeholder Supabase/origin/Turnstile values and a local Auth mock so verification does not depend on `.env.local` or the live project; it installs Chromium/WebKit and runs browser tests after `npm run verify`. Local verification with these values passed. |
 | Production dependency audit | PASS | `npm audit --omit=dev --audit-level=high`: 0 vulnerabilities. |
 | Full dependency audit | WARNING | `npm audit --audit-level=high` reports one newly published high-severity advisory (CVE-2026-93687 / GHSA-vfj7-8cjw-p6xm) through the development-only chain `eslint-config-next` → `@next/eslint-plugin-next` → `fast-glob` → `micromatch` → `braces`. `braces@3.0.3` is the latest published release and is affected; no patched upstream version is available. The production dependency audit remains clean. |
 | Local web-tier load probe | LIMITED PASS | Against the local optimized production server, 100/100, 500/500, 1,000/1,000, and 2,500/2,500 liveness requests passed with a 10-second timeout. At 5,000 requests, 3,710/5,000 passed before the 10-second timeout (p95 10.17s). Repeating 5,000 with a 30-second timeout passed 5,000/5,000 (p50 10.28s, p95 17.32s, p99 17.85s). This is a same-machine probe of `/api/health/live`, not a deployed capacity test and not a database/authenticated workload benchmark. |
@@ -34,7 +34,7 @@ Status reflects database checks completed on 2026-10-08 and application/load che
 | Deployment and domain | BLOCKED | No hosting account/project or verified production domain is connected. The local canonical origin is localhost; production environment values, deployed headers, backups/PITR, and recovery checks remain unverified. |
 | Initial operations/content | BLOCKED | No production administrator has been provisioned, and the database contains schema but no production question/exam content or user accounts. Provisioning needs the operator's account and content with rights. |
 | Legal/operator information | BLOCKED | Legal pages require the actual operator identity and contact information, plus review of privacy/vendor obligations; these facts cannot be invented. |
-| GitHub publication | PASS | The verified source is published on `main` in `MDvoroPlatform/MDvoro`. At the start of the current CI update, remote `refs/heads/main` matched local commit `428bc3cbdf6fb63daaeca8aa3c0b274469df623e`; the CI changes are being pushed separately. No `.env.local` or service-role secret was committed. |
+| GitHub publication | PASS | Source and current auth-boundary/CI updates are published to `main` in `MDvoroPlatform/MDvoro`; the remote head is verified after push. No `.env.local` or service-role secret was committed. |
 
 ## Findings fixed during live testing
 
@@ -48,6 +48,12 @@ Status reflects database checks completed on 2026-10-08 and application/load che
 The 5,000-request probe confirms the local production server eventually returned a successful liveness response to all requests when given 30 seconds, but response times were high. It does not establish that a hosted deployment can serve 5,000 real users or authenticated requests: the generator and server shared this workstation, and the probe did not exercise Supabase, login, QBank, admin, or other database-backed flows. A representative staging deployment and a controlled ramp test with test accounts are still required before making a capacity claim. No load was sent to the live Supabase project.
 
 The current full dependency audit also has one unresolved development-tool advisory. It is not in the production dependency tree, and the package's latest published version has no upstream fix yet. Re-run the audit and update the Next ESLint toolchain when the maintainer publishes a patched release.
+
+## Application changes from the latest browser checks
+
+- Protected student and admin page navigation now checks the verified session claims in Proxy and redirects anonymous visitors to `/login` before streaming the page shell. The page layouts, server authorization checks, MFA gates, and API checks remain in place.
+- Added an isolated local Supabase Auth mock for browser tests. The mock always represents an unauthenticated visitor and cannot write to the MDvoro Supabase project.
+- GitHub Actions now supplies non-secret CI-only environment values, installs Chromium/WebKit, and runs the browser suite after the full build verification.
 
 ## Release decision
 

@@ -9,7 +9,7 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-public-key
       NEXT_PUBLIC_SITE_URL: https://mdvoro-ci.invalid
       MDVORO_APP_ORIGIN: https://mdvoro-ci.invalid

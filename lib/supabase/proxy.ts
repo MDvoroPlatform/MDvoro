@@ -1,5 +1,16 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+
+const protectedPageRoots = [
+    '/admin', '/analytics', '/dashboard', '/exam-guide', '/flashcards',
+    '/knowledge', '/leaderboard', '/library', '/notebook', '/qbank',
+    '/settings', '/study-plan',
+];
+
+function isProtectedPage(pathname: string) {
+    return protectedPageRoots.some((root) => pathname === root || pathname.startsWith(`${root}/`));
+}
+
 function securityPolicy(nonce: string) {
     return [
         "default-src 'self'",
@@ -39,10 +50,16 @@ export async function updateSession(request: NextRequest) {
             }
         }
     });
-    await supabase.auth.getClaims();
+    const { data } = await supabase.auth.getClaims();
+    const claims = data?.claims;
     response.headers.set('Content-Security-Policy', csp);
     response.headers.set('x-nonce', nonce);
     response.headers.set('x-request-id', requestId);
+    // This is only an optimistic page-navigation redirect. Protected layouts and
+    // API handlers still perform full user, role, MFA, and database checks.
+    if (isProtectedPage(request.nextUrl.pathname) && !claims?.sub) {
+        return NextResponse.redirect(new URL('/login', request.url));
+    }
     return response;
 }
 
