@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { loginSchema, signUpSchema } from '@/lib/validation/auth';
@@ -9,6 +10,7 @@ import { Turnstile } from '@/components/auth/turnstile';
 import { isEmailSendRateLimitError } from '@/lib/auth/errors';
 
 const CAPTCHA_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+const REMEMBERED_EMAIL_KEY = 'mdvoro.remembered-email';
 
 export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     const router = useRouter();
@@ -20,6 +22,26 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [captchaToken, setCaptchaToken] = useState('');
+    const [rememberEmail, setRememberEmail] = useState(false);
+
+    useEffect(() => {
+        if (mode !== 'login') return;
+        let timer: number | undefined;
+        try {
+            const rememberedEmail = window.localStorage.getItem(REMEMBERED_EMAIL_KEY);
+            if (rememberedEmail) {
+                timer = window.setTimeout(() => {
+                    setEmail(rememberedEmail);
+                    setRememberEmail(true);
+                }, 0);
+            }
+        } catch {
+            // Login still works when browser storage is unavailable.
+        }
+        return () => {
+            if (timer !== undefined) window.clearTimeout(timer);
+        };
+    }, [mode]);
 
     const onCaptchaToken = useCallback((token: string) => {
         setCaptchaToken(token);
@@ -29,6 +51,17 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         setCaptchaToken('');
         setError(m.auth.genericError);
     }, [m.auth.genericError]);
+
+    function updateRememberEmail(checked: boolean) {
+        setRememberEmail(checked);
+        if (!checked) {
+            try {
+                window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+            } catch {
+                // Login still works when browser storage is unavailable.
+            }
+        }
+    }
 
     async function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -76,6 +109,12 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
                     setError(m.auth.genericError);
                     return;
                 }
+                try {
+                    if (rememberEmail) window.localStorage.setItem(REMEMBERED_EMAIL_KEY, parsed.data.email);
+                    else window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+                } catch {
+                    // Session sign-in succeeds even when browser storage is unavailable.
+                }
                 router.replace('/dashboard');
             }
         } catch {
@@ -89,6 +128,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         {mode === 'signup' ? <div className="field"><label htmlFor="fullName">{m.auth.fullName}</label><input id="fullName" autoComplete="name" value={fullName} onChange={e => setFullName(e.target.value)} required maxLength={80} /></div> : null}
         <div className="field"><label htmlFor="email">{m.auth.email}</label><input id="email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={254} /></div>
         <div className="field"><label htmlFor="password">{m.auth.password}</label><input id="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} maxLength={128} /></div>
+        {mode === 'login' ? <div className="auth-form-options">
+            <label className="auth-remember"><input type="checkbox" checked={rememberEmail} onChange={e => updateRememberEmail(e.target.checked)} /><span>{m.auth.rememberEmail}</span></label>
+            <Link className="muted-link" href="/forgot-password">{m.auth.forgotPassword}</Link>
+        </div> : null}
         {mode === 'signup' ? <Turnstile onToken={onCaptchaToken} onError={onCaptchaError} /> : null}
         {error ? <div className="form-error" role="alert">{error}</div> : null}
         {message ? <div className="form-success" role="status">{message}</div> : null}

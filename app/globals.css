@@ -226,6 +226,10 @@ h1 { margin:5px 0 0;font-size:30px;letter-spacing:-1px;line-height:1.15; }
 .auth-brand-mark { background:var(--sidebar); }
 .auth-title { font-size:27px; }
 .auth-footer { margin:18px 0 0;font-size:12px;color:var(--muted); }
+.auth-form-options { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:-2px; }
+.auth-remember { display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;cursor:pointer; }
+.auth-remember input { width:16px;height:16px;margin:0;accent-color:var(--brand); }
+@media (max-width:420px) { .auth-form-options { align-items:flex-start;flex-direction:column;gap:10px; } }
 .auth-note { margin-top:24px;font-size:13px;color:var(--muted); }
 .loading-card { padding:28px;width:340px;text-align:center; }
 .error-action { margin-top:20px; }
