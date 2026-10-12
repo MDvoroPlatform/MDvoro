@@ -179,13 +179,13 @@ export function AuthForm({ mode, loginCopy }: { mode: 'login' | 'signup'; loginC
         </button>;
     const divider = <div className="auth-divider" aria-hidden="true">{m.auth.or}</div>;
     const emailField = <div className="field auth-login-field"><label htmlFor="email">{loginCopy?.email ?? m.auth.email}</label><div className="auth-login-input"><Icon name="mail" size={21} /><input id="email" type="email" autoComplete="email" placeholder="you@mdvoro.com" value={email} onChange={e => setEmail(e.target.value)} required maxLength={254} /></div></div>;
-    const passwordField = <div className="field auth-login-field"><label htmlFor="password">{loginCopy?.password ?? m.auth.password}</label><div className="auth-login-input"><Icon name="lock" size={21} /><input id="password" type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} maxLength={128} /><button className="auth-password-toggle" type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? loginCopy?.hide : loginCopy?.show} aria-pressed={showPassword}><Icon name="eye" size={21} /></button></div></div>;
+    const passwordField = <div className="field auth-login-field"><label htmlFor="password">{loginCopy?.password ?? m.auth.password}</label><div className="auth-login-input"><Icon name="lock" size={21} /><input id="password" type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} maxLength={128} /><button className="auth-password-toggle" type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? loginCopy?.hide ?? 'Hide password' : loginCopy?.show ?? 'Show password'} aria-pressed={showPassword}><Icon name="eye" size={21} /></button></div></div>;
     const rememberRow = <div className="auth-form-options">
             <label className="auth-remember"><input type="checkbox" checked={rememberEmail} onChange={e => updateRememberEmail(e.target.checked)} /><span>{loginCopy?.remember ?? m.auth.rememberEmail}</span></label>
             <Link className="muted-link" href="/forgot-password">{m.auth.forgotPassword}</Link>
         </div>;
 
-    return <form className={mode === 'login' ? 'form auth-login-form' : 'form'} onSubmit={submit} noValidate>
+    return <form className="form auth-login-form" onSubmit={submit} noValidate>
         {mode === 'login' ? <>
             {emailField}
             {passwordField}
@@ -194,13 +194,13 @@ export function AuthForm({ mode, loginCopy }: { mode: 'login' | 'signup'; loginC
             {googleButton}
             {divider}
             <div className="field"><label htmlFor="fullName">{m.auth.fullName}</label><input id="fullName" autoComplete="name" value={fullName} onChange={e => setFullName(e.target.value)} required maxLength={80} /></div>
-            <div className="field"><label htmlFor="email">{m.auth.email}</label><input id="email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={254} /></div>
-            <div className="field"><label htmlFor="password">{m.auth.password}</label><input id="password" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} maxLength={128} /></div>
+            {emailField}
+            {passwordField}
         </>}
         {CAPTCHA_CONFIGURED ? <Turnstile key={captchaVersion} onToken={onCaptchaToken} onError={onCaptchaError} /> : null}
         {error ? <div className="form-error" role="alert">{error}</div> : null}
         {message ? <div className="form-success" role="status">{message}</div> : null}
-        <button type="submit" className={`btn btn-primary${mode === 'login' ? ' auth-login-submit' : ''}`} disabled={loading || !captchaToken}>
+        <button type="submit" className="btn btn-primary auth-login-submit" disabled={loading || !captchaToken}>
             {loading ? m.auth.pleaseWait : mode === 'login' ? <>{m.auth.signIn}<Icon name="arrow" size={21} /></> : m.auth.create}
         </button>
         {mode === 'login' ? <>{divider}{googleButton}</> : null}

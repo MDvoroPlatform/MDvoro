@@ -66,14 +66,14 @@ export function PasswordResetRequestForm() {
             }
         }
     }
-    return (<form className="form" onSubmit={submit} noValidate>
+    return (<form className="form auth-login-form" onSubmit={submit} noValidate>
       <div className="field">
         <label htmlFor="reset-email">{m.auth.email}</label>
         <input id="reset-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254}/>
       </div>
       {CAPTCHA_CONFIGURED ? <Turnstile key={captchaVersion} onToken={onCaptchaToken} onError={onCaptchaError} /> : null}
       {message && <div className={isError ? 'form-error' : 'form-success'} role={isError ? 'alert' : 'status'}>{message}</div>}
-      <button type="submit" className="btn btn-primary" disabled={busy || !email.trim() || !captchaToken}>{busy ? m.auth.pleaseWait : m.common.save}</button>
+      <button type="submit" className="btn btn-primary auth-login-submit" disabled={busy || !email.trim() || !captchaToken}>{busy ? m.auth.pleaseWait : m.common.save}</button>
     </form>);
 }
 export function PasswordUpdateForm() {
@@ -107,7 +107,7 @@ export function PasswordUpdateForm() {
             setBusy(false);
         }
     }
-    return (<form className="form" onSubmit={submit} noValidate>
+    return (<form className="form auth-login-form" onSubmit={submit} noValidate>
       <div className="field">
         <label htmlFor="new-password">{m.auth.password}</label>
         <input id="new-password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} maxLength={128} required/>
@@ -117,6 +117,6 @@ export function PasswordUpdateForm() {
         <input id="confirm-password" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={8} maxLength={128} required/>
       </div>
       {message && <div className={isError ? 'form-error' : 'form-success'} role={isError ? 'alert' : 'status'}>{message}</div>}
-      <button type="submit" className="btn btn-primary" disabled={busy || password.length < 8 || password !== confirm}>{busy ? m.auth.pleaseWait : m.common.save}</button>
+      <button type="submit" className="btn btn-primary auth-login-submit" disabled={busy || password.length < 8 || password !== confirm}>{busy ? m.auth.pleaseWait : m.common.save}</button>
     </form>);
 }

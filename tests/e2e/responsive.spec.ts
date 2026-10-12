@@ -16,6 +16,7 @@ const publicPages = [
   '/login',
   '/sign-up',
   '/forgot-password',
+  '/reset-password',
   '/legal/privacy',
   '/legal/terms',
 ] as const;
@@ -32,6 +33,25 @@ test('public entry and legal pages remain within responsive viewport widths', as
     await page.goto(path, { waitUntil: 'load' });
     await expect(page.locator('body')).toBeVisible();
     for (const width of [390, 768, 1440]) await assertNoHorizontalOverflow(page, path, width, `${width}px`);
+  }
+});
+
+test('auth screens share the branded layout and an opaque full-colour logo', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'The local HTTP test server cannot serve assets after this site’s production HSTS policy.');
+  for (const path of ['/login', '/sign-up', '/forgot-password', '/reset-password']) {
+    await page.goto(path, { waitUntil: 'load' });
+    const layout = page.locator('.auth-login-wrap');
+    await expect(layout).toBeVisible();
+    await expect(layout.locator('.auth-login-header')).toBeVisible();
+    await expect(layout.locator('.auth-login-card')).toBeVisible();
+    const logo = layout.locator('.mdvoro-logo-light');
+    await expect(logo).toBeVisible();
+    const logoState = await logo.evaluate(element => ({
+      opacity: getComputedStyle(element).opacity,
+      filter: getComputedStyle(element).filter,
+      width: (element as HTMLImageElement).naturalWidth,
+    }));
+    expect(logoState).toMatchObject({ opacity: '1', filter: 'none', width: 880 });
   }
 });
 
