@@ -1,0 +1,107 @@
+.overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: max(24px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom));
+  isolation: isolate;
+  background: #fff;
+  color: #101b2d;
+}
+
+.content {
+  display: flex;
+  width: min(100%, 520px);
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  transform: translateY(-2vh);
+}
+
+.logo {
+  display: block;
+  width: min(78vw, 430px);
+  height: auto;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: logo-enter 700ms cubic-bezier(.2, .75, .25, 1) both;
+}
+
+.spinner {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  animation: fade-in 400ms 100ms ease both;
+}
+
+.track,
+.arc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.track {
+  border: 2px solid #edf3fc;
+}
+
+.arc {
+  border: 2px solid transparent;
+  border-top-color: #0878ff;
+  border-right-color: #0878ff;
+  animation: spin 900ms linear infinite;
+}
+
+.dot {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0878ff;
+  box-shadow: 0 0 11px rgb(8 120 255 / 30%);
+}
+
+.message {
+  margin: -12px 0 0;
+  color: #526176;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: .005em;
+  text-align: center;
+  animation: fade-in 500ms 120ms ease both;
+}
+
+@keyframes logo-enter {
+  from { opacity: 0; transform: translateY(9px); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 380px) {
+  .content { gap: 25px; }
+  .logo { width: min(84vw, 360px); }
+  .message { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo,
+  .spinner,
+  .arc,
+  .message { animation: none; }
+}
