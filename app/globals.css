@@ -65,9 +65,9 @@ h1 { margin:5px 0 0;font-size:30px;letter-spacing:-1px;line-height:1.15; }
 .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:var(--shadow-sm); }
 .card-pad { padding:20px; }
 .metric { padding:18px; min-height:118px; }
-.metric-label { color:var(--muted);font-size:12px;font-weight:700; }
-.metric-value { margin-top:9px;font-size:27px;font-weight:800;letter-spacing:-.7px; }
-.metric-note { margin-top:6px;color:#718198;font-size:11px; }
+.metric-label { display:block;min-width:0;color:var(--muted);font-size:12px;font-weight:700; }
+.metric-value { display:block;min-width:0;margin-top:9px;font-size:27px;font-weight:800;letter-spacing:-.7px; }
+.metric-note { display:block;min-width:0;margin-top:6px;color:#718198;font-size:11px;line-height:1.5; }
 .panel-head { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px; }
 .panel-title { font-size:15px;font-weight:800; }
 .panel-sub { color:var(--muted);font-size:12px; }
@@ -674,7 +674,9 @@ html[dir="rtl"] .mobile-drawer-links a.active, html[dir="rtl"] .admin-mobile-pan
   .shell, .admin-shell { display: block; min-height: 100dvh; }
   .sidebar, .admin-sidebar { display: none; }
   .main, .admin-main { width: 100%; }
-  .topbar { min-height: 64px; height: auto; padding: 8px 12px; gap: 9px; }
+  /* A backdrop-filter creates a containing block for fixed descendants in Safari.
+     Keep the mobile drawer anchored to the viewport instead of trapping it in the topbar. */
+  .topbar { min-height: 64px; height: auto; padding: 8px 12px; gap: 9px; background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .topbar-mobile-controls { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
   .mobile-drawer, .admin-mobile-drawer { position: relative; display: block; flex: 0 0 auto; }
   .mobile-drawer > summary, .admin-mobile-drawer > summary { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink); cursor: pointer; }
