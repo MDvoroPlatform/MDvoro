@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -22,6 +22,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [captchaToken, setCaptchaToken] = useState('');
+    const [captchaVersion, setCaptchaVersion] = useState(0);
+    const captchaError = useRef(false);
     const [rememberEmail, setRememberEmail] = useState(false);
 
     useEffect(() => {
@@ -45,9 +47,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
 
     const onCaptchaToken = useCallback((token: string) => {
         setCaptchaToken(token);
-        setError('');
+        if (captchaError.current) {
+            captchaError.current = false;
+            setError('');
+        }
     }, []);
     const onCaptchaError = useCallback(() => {
+        captchaError.current = true;
         setCaptchaToken('');
         setError(m.auth.genericError);
     }, [m.auth.genericError]);
@@ -67,7 +73,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         e.preventDefault();
         setError('');
         setMessage('');
+        captchaError.current = false;
         setLoading(true);
+        let attemptedAuth = false;
         try {
             const supabase = createClient();
             if (mode === 'signup') {
@@ -80,6 +88,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
                     setError(parsed.error.issues[0]?.message ?? m.auth.genericError);
                     return;
                 }
+                attemptedAuth = true;
                 const result = await supabase.auth.signUp({
                     email: parsed.data.email,
                     password: parsed.data.password,
@@ -96,14 +105,20 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
                 setCaptchaToken('');
                 setMessage(m.auth.accountCreated);
             } else {
+                if (!CAPTCHA_CONFIGURED || !captchaToken) {
+                    setError(m.auth.genericError);
+                    return;
+                }
                 const parsed = loginSchema.safeParse({ email, password });
                 if (!parsed.success) {
                     setError(parsed.error.issues[0]?.message ?? m.auth.genericError);
                     return;
                 }
+                attemptedAuth = true;
                 const result = await supabase.auth.signInWithPassword({
                     email: parsed.data.email,
                     password: parsed.data.password,
+                    options: { captchaToken },
                 });
                 if (result.error) {
                     setError(m.auth.genericError);
@@ -121,6 +136,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             setError(m.auth.genericError);
         } finally {
             setLoading(false);
+            if (attemptedAuth) {
+                setCaptchaToken('');
+                setCaptchaVersion((version) => version + 1);
+            }
         }
     }
 
@@ -132,10 +151,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             <label className="auth-remember"><input type="checkbox" checked={rememberEmail} onChange={e => updateRememberEmail(e.target.checked)} /><span>{m.auth.rememberEmail}</span></label>
             <Link className="muted-link" href="/forgot-password">{m.auth.forgotPassword}</Link>
         </div> : null}
-        {mode === 'signup' ? <Turnstile onToken={onCaptchaToken} onError={onCaptchaError} /> : null}
+        {CAPTCHA_CONFIGURED ? <Turnstile key={captchaVersion} onToken={onCaptchaToken} onError={onCaptchaError} /> : null}
         {error ? <div className="form-error" role="alert">{error}</div> : null}
         {message ? <div className="form-success" role="status">{message}</div> : null}
-        <button type="submit" className="btn btn-primary" disabled={loading || (mode === 'signup' && !captchaToken)}>
+        <button type="submit" className="btn btn-primary" disabled={loading || !captchaToken}>
             {loading ? m.auth.pleaseWait : mode === 'login' ? m.auth.signIn : m.auth.create}
         </button>
     </form>;

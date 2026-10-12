@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
 
+async function installTurnstileStub(page: import('@playwright/test').Page) {
+  await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/javascript',
+    body: `window.turnstile = { render: (_element, options) => { queueMicrotask(() => options.callback('test-captcha-token')); return 'test-widget'; }, remove: () => {} };`,
+  }));
+}
+
 test('student and admin pages redirect anonymous visitors to sign in', async ({ page }) => {
   test.setTimeout(60000);
   for (const path of ['/dashboard', '/qbank', '/settings', '/admin/users']) {
@@ -11,6 +19,7 @@ test('student and admin pages redirect anonymous visitors to sign in', async ({ 
 
 test('login links to password recovery and sends the reset request without revealing account existence', async ({ page, browserName }) => {
   test.skip(browserName === 'webkit', 'The local HTTP test server cannot serve resources after Safari applies production HSTS.');
+  await installTurnstileStub(page);
   await page.route('**/auth/v1/recover**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
   await page.addInitScript(() => localStorage.setItem('mdvoro_cookie_consent', 'essential'));
   await page.goto('/login');
@@ -19,8 +28,29 @@ test('login links to password recovery and sends the reset request without revea
   await page.getByRole('textbox', { name: 'Email' }).fill('student@example.com');
   const resetRequest = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/auth/v1/recover'));
   await page.getByRole('button', { name: 'Save' }).click();
-  await resetRequest;
-  await expect(page.getByRole('status')).toHaveText('If the account exists, a reset link has been sent.');
+  const request = await resetRequest;
+  expect(request.postDataJSON()).toMatchObject({ gotrue_meta_security: { captcha_token: 'test-captcha-token' } });
+  expect(new URL(request.url()).searchParams.get('redirect_to')).toContain('/auth/callback?next=/reset-password');
+  await expect(page.locator('.form-success')).toHaveText('If the account exists, a reset link has been sent.');
+});
+
+test('password login sends Turnstile token to Supabase Auth', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'The local HTTP test server cannot serve resources after Safari applies production HSTS.');
+  await installTurnstileStub(page);
+  await page.route('**/auth/v1/token**', route => route.fulfill({
+    status: 400,
+    contentType: 'application/json',
+    body: JSON.stringify({ code: 400, message: 'Invalid login credentials' }),
+  }));
+  await page.addInitScript(() => localStorage.setItem('mdvoro_cookie_consent', 'essential'));
+  await page.goto('/login');
+  await page.getByRole('textbox', { name: 'Email' }).fill('student@example.com');
+  await page.getByLabel('Password').fill('not-a-real-password');
+  const authRequest = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/auth/v1/token'));
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  const request = await authRequest;
+  expect(request.postDataJSON()).toMatchObject({ gotrue_meta_security: { captcha_token: 'test-captcha-token' } });
+  await expect(page.locator('.form-error')).toHaveText('We could not complete that request. Check your details and try again.');
 });
 
 test('remember email restores the saved address and can be cleared without saving a password', async ({ page, browserName }) => {
