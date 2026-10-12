@@ -53,6 +53,20 @@ test('password login sends Turnstile token to Supabase Auth', async ({ page, bro
   await expect(page.locator('.form-error')).toHaveText('We could not complete that request. Check your details and try again.');
 });
 
+test('Google sign-in starts the Supabase OAuth flow with the trusted callback', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'The local HTTP test server cannot serve resources after Safari applies production HSTS.');
+  await page.route('**/auth/v1/authorize**', route => route.abort());
+  await page.addInitScript(() => localStorage.setItem('mdvoro_cookie_consent', 'essential'));
+  await page.goto('/login');
+  const oauthRequest = page.waitForRequest(request => new URL(request.url()).pathname.endsWith('/auth/v1/authorize'));
+  await page.getByRole('button', { name: 'Continue with Google' }).click();
+  const request = await oauthRequest;
+  const url = new URL(request.url());
+  expect(url.searchParams.get('provider')).toBe('google');
+  expect(url.searchParams.get('redirect_to')).toBe('http://127.0.0.1:3000/auth/callback');
+  expect(url.searchParams.get('prompt')).toBe('select_account');
+});
+
 test('remember email restores the saved address and can be cleared without saving a password', async ({ page, browserName }) => {
   test.skip(browserName === 'webkit', 'The local HTTP test server cannot serve resources after Safari applies production HSTS.');
   await page.addInitScript(() => {

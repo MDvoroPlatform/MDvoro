@@ -227,6 +227,10 @@ h1 { margin:5px 0 0;font-size:30px;letter-spacing:-1px;line-height:1.15; }
 .auth-title { font-size:27px; }
 .auth-footer { margin:18px 0 0;font-size:12px;color:var(--muted); }
 .auth-form-options { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:-2px; }
+.btn-google { width:100%; min-height:44px; color:#202124; background:#fff; border-color:#d9dce1; }
+.btn-google:hover:not(:disabled) { background:#f8f9fa; border-color:#c6c9ce; }
+.auth-divider { display:flex; align-items:center; gap:12px; color:var(--muted); font-size:12px; line-height:1; }
+.auth-divider::before,.auth-divider::after { content:""; flex:1; height:1px; background:var(--line); }
 .auth-remember { display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;cursor:pointer; }
 .auth-remember input { width:16px;height:16px;margin:0;accent-color:var(--brand); }
 @media (max-width:420px) { .auth-form-options { align-items:flex-start;flex-direction:column;gap:10px; } }
