@@ -4,7 +4,7 @@ type IconProps = {
 };
 const base = (p: IconProps) => ({ width: p.size ?? 18, height: p.size ?? 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: p.stroke ?? 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true });
 export function Icon({ name, ...p }: IconProps & {
-    name: 'grid' | 'book' | 'cards' | 'calendar' | 'chart' | 'settings' | 'search' | 'bell' | 'arrow' | 'target' | 'brain' | 'check' | 'shield' | 'logout' | 'plus' | 'clock' | 'spark' | 'eye' | 'globe' | 'moon' | 'sun' | 'bookmark' | 'trophy' | 'menu';
+    name: 'grid' | 'book' | 'cards' | 'calendar' | 'chart' | 'settings' | 'search' | 'bell' | 'arrow' | 'target' | 'brain' | 'check' | 'shield' | 'logout' | 'plus' | 'clock' | 'spark' | 'eye' | 'globe' | 'moon' | 'sun' | 'bookmark' | 'trophy' | 'menu' | 'mail' | 'lock' | 'graduation' | 'trending';
 }) {
     const a = base(p);
     const paths: Record<string, React.ReactNode> = {
@@ -30,6 +30,10 @@ export function Icon({ name, ...p }: IconProps & {
         spark: <><path d="m12 3 1.4 5.1L18 10l-4.6 1.9L12 17l-1.4-5.1L6 10l4.6-1.9z"/><path d="m19 16 .6 2.2L22 19l-2.4.8L19 22l-.6-2.2L16 19l2.4-.8z"/></>,
         eye: <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="2.5"/></>,
         globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z"/></>,
+        mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></>,
+        lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3M12 14v3"/></>,
+        graduation: <><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c3.5 3 8.5 3 12 0v-5M22 9v6"/></>,
+        trending: <><path d="M3 17 9 11l4 4 8-9"/><path d="M15 6h6v6"/></>,
         moon: <><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5a8.5 8.5 0 1 0 12 12z"/></>,
         sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>
     };

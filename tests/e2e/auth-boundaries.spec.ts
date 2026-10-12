@@ -44,8 +44,8 @@ test('password login sends Turnstile token to Supabase Auth', async ({ page, bro
   }));
   await page.addInitScript(() => localStorage.setItem('mdvoro_cookie_consent', 'essential'));
   await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Email' }).fill('student@example.com');
-  await page.getByLabel('Password').fill('not-a-real-password');
+  await page.getByRole('textbox', { name: 'Email address' }).fill('student@example.com');
+  await page.getByRole('textbox', { name: 'Password' }).fill('not-a-real-password');
   const authRequest = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/auth/v1/token'));
   await page.getByRole('button', { name: 'Sign in' }).click();
   const request = await authRequest;
@@ -74,13 +74,27 @@ test('remember email restores the saved address and can be cleared without savin
     localStorage.setItem('mdvoro.remembered-email', 'student@example.com');
   });
   await page.goto('/login');
-  const email = page.getByRole('textbox', { name: 'Email' });
-  const remember = page.getByLabel('Remember my email on this device');
+  const email = page.getByRole('textbox', { name: 'Email address' });
+  const remember = page.getByLabel('Remember me');
   await expect(email).toHaveValue('student@example.com');
   await expect(remember).toBeChecked();
   await remember.uncheck();
   await expect.poll(() => page.evaluate(() => localStorage.getItem('mdvoro.remembered-email'))).toBeNull();
-  await expect(page.getByLabel('Password')).toBeEmpty();
+  await expect(page.getByRole('textbox', { name: 'Password' })).toBeEmpty();
+});
+
+test('password visibility can be toggled without changing the entered value', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'The local HTTP test server cannot serve resources after Safari applies production HSTS.');
+  await page.addInitScript(() => localStorage.setItem('mdvoro_cookie_consent', 'essential'));
+  await page.goto('/login');
+  const password = page.getByRole('textbox', { name: 'Password' });
+  await password.fill('example-password');
+  await expect(password).toHaveAttribute('type', 'password');
+  await page.getByRole('button', { name: 'Show password' }).click();
+  await expect(password).toHaveAttribute('type', 'text');
+  await expect(password).toHaveValue('example-password');
+  await page.getByRole('button', { name: 'Hide password' }).click();
+  await expect(password).toHaveAttribute('type', 'password');
 });
 
 test('student and admin APIs reject anonymous requests without returning protected data', async ({ request }) => {
