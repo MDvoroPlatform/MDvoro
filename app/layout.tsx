@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { getI18n } from '@/lib/i18n/server';
 import { I18nProvider } from '@/components/i18n/provider';
@@ -16,6 +16,11 @@ export const metadata: Metadata = {
         apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
     },
     manifest: '/manifest.json',
+};
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
 };
 export default async function RootLayout({ children }: Readonly<{
     children: ReactNode;
