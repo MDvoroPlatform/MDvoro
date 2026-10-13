@@ -10,6 +10,7 @@ export function AdminMfaSetup() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('loading');
   const [factorId, setFactorId] = useState('');
+  const [pendingFactorId, setPendingFactorId] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [secret, setSecret] = useState('');
   const [code, setCode] = useState('');
@@ -27,8 +28,9 @@ export function AdminMfaSetup() {
         setFactorId(verified.id);
         setMode('verify');
       } else if (unverified) {
+        setPendingFactorId(unverified.id);
         setMode('blocked');
-        setMessage('An unfinished authenticator setup already exists. Contact support to safely reset it.');
+        setMessage('An unfinished setup is saved, but its QR code is no longer available in this page. Remove that unverified setup to create a fresh QR code.');
       } else if (error) {
         setMode('blocked');
         setMessage('Could not check authenticator status. Refresh the page and try again.');
@@ -58,6 +60,40 @@ export function AdminMfaSetup() {
       setMode('enroll');
     } catch {
       setMessage('Could not start authenticator setup. Refresh the page and try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardPendingSetup() {
+    if (busy || !pendingFactorId) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      const { data, error: listError } = await supabase.auth.mfa.listFactors();
+      if (listError) {
+        setMessage('Could not verify the pending setup. Refresh the page and try again.');
+        return;
+      }
+      const pending = data?.all.find((factor) => factor.id === pendingFactorId && factor.factor_type === 'totp' && factor.status === 'unverified');
+      if (!pending) {
+        setMessage('The pending setup changed. Refresh this page to check the current authenticator status.');
+        return;
+      }
+      const { error } = await supabase.auth.mfa.unenroll({ factorId: pending.id });
+      if (error) {
+        setMessage('Could not remove the unfinished setup. Refresh the page and try again.');
+        return;
+      }
+      setPendingFactorId('');
+      setFactorId('');
+      setQrCode('');
+      setSecret('');
+      setCode('');
+      setMode('setup');
+      setMessage('The unfinished setup was removed. Start again to get a new QR code.');
+    } catch {
+      setMessage('Could not remove the unfinished setup. Refresh the page and try again.');
     } finally {
       setBusy(false);
     }
@@ -108,6 +144,15 @@ export function AdminMfaSetup() {
           <p className="panel-sub">Set up an authenticator app such as Google Authenticator, Microsoft Authenticator, or 1Password. You will scan a QR code and enter its six-digit code.</p>
           <button className="btn btn-primary" type="button" onClick={() => void beginSetup()} disabled={busy}>
             {busy ? 'Starting setup…' : 'Set up authenticator'}
+          </button>
+        </div>
+      )}
+
+      {mode === 'blocked' && pendingFactorId && (
+        <div className="form">
+          <p className="panel-sub">The previous setup was not verified, and its private QR code was lost when the page closed. Remove only that unverified setup to start over.</p>
+          <button className="btn btn-primary" type="button" onClick={() => void discardPendingSetup()} disabled={busy}>
+            {busy ? 'Resetting setup…' : 'Reset unfinished setup'}
           </button>
         </div>
       )}
