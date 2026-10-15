@@ -59,13 +59,13 @@ test('mobile dashboard metrics stack cleanly and the navigation drawer covers th
   await page.setContent(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
     <div class="shell">
       <header class="topbar">
-        <details class="mobile-drawer" open>
-          <summary>Menu</summary>
-          <button class="mobile-drawer-backdrop" aria-label="Close menu"></button>
-          <nav class="mobile-drawer-panel">
+        <div class="mobile-drawer is-open">
+          <button type="button" class="mobile-menu-button" aria-label="Close menu">Menu</button>
+          <button type="button" class="mobile-drawer-backdrop" aria-label="Close menu"></button>
+          <nav class="mobile-drawer-panel" role="dialog" aria-modal="true">
             <div class="mobile-drawer-heading"><strong>MDvoro</strong><span>Learn. Practice. Excel.</span></div>
           </nav>
-        </details>
+        </div>
       </header>
       <main class="page">
         <section class="grid grid-4 dashboard-metrics">
@@ -94,6 +94,7 @@ test('mobile dashboard metrics stack cleanly and the navigation drawer covers th
       };
       return {
         topbarBackdrop: getComputedStyle(topbar).backdropFilter,
+        topbar: box(topbar),
         drawer: box(drawer),
         labelDisplay: getComputedStyle(label).display,
         valueDisplay: getComputedStyle(value).display,
@@ -104,7 +105,7 @@ test('mobile dashboard metrics stack cleanly and the navigation drawer covers th
     });
 
     expect(layout.topbarBackdrop, `${width}px topbar backdrop`).toBe('none');
-    expect(layout.drawer.top, `${width}px drawer top`).toBe(64);
+    expect(layout.drawer.top, `${width}px drawer top`).toBe(layout.topbar.bottom);
     expect(layout.drawer.bottom, `${width}px drawer bottom`).toBe(layout.viewportHeight);
     expect(layout.labelDisplay).toBe('block');
     expect(layout.valueDisplay).toBe('block');

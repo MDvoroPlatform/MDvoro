@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { MouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/icons';
 import { useI18n } from '@/components/i18n/provider';
 const NAV_ITEMS = [
@@ -18,7 +18,7 @@ const NAV_ITEMS = [
     ['/settings', 'settings', 'settings'],
 ] as const;
 const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
-function NavLinks({ staff, closeOnNavigate = false }: { staff: boolean; closeOnNavigate?: boolean }) {
+function NavLinks({ staff, onNavigate }: { staff: boolean; onNavigate?: () => void }) {
     const pathname = usePathname();
     const { messages, locale } = useI18n();
     const labelFor = (key: string) => key === 'notebook'
@@ -26,15 +26,12 @@ function NavLinks({ staff, closeOnNavigate = false }: { staff: boolean; closeOnN
         : key === 'examGuide'
             ? ({ en: 'Exam Guide', he: 'מדריך הבחינה', ar: 'دليل الامتحان', ru: 'Гид по экзамену' } as const)[locale]
             : messages.nav[key as keyof typeof messages.nav];
-    const close = (event: MouseEvent<HTMLAnchorElement>) => {
-        if (closeOnNavigate) event.currentTarget.closest('details')?.removeAttribute('open');
-    };
     return <>
       {NAV_ITEMS.map(([href, key, icon]) => {
           const active = isActive(pathname, href);
-          return <Link key={href} href={href} onClick={close} className={active ? 'active' : undefined} aria-current={active ? 'page' : undefined}><Icon name={icon}/><span>{labelFor(key)}</span></Link>;
+          return <Link key={href} href={href} onClick={onNavigate} className={active ? 'active' : undefined} aria-current={active ? 'page' : undefined}><Icon name={icon}/><span>{labelFor(key)}</span></Link>;
       })}
-      {staff && <Link href="/admin" onClick={close} className={isActive(pathname, '/admin') ? 'active' : undefined} aria-current={isActive(pathname, '/admin') ? 'page' : undefined}><Icon name="shield"/><span>{messages.nav.contentStudio}</span></Link>}
+      {staff && <Link href="/admin" onClick={onNavigate} className={isActive(pathname, '/admin') ? 'active' : undefined} aria-current={isActive(pathname, '/admin') ? 'page' : undefined}><Icon name="shield"/><span>{messages.nav.contentStudio}</span></Link>}
     </>;
 }
 export function PrimaryNav({ staff }: {
@@ -65,13 +62,33 @@ function MobileNavItems() {
 }
 
 export function MobileNavDrawer({ staff }: { staff: boolean }) {
-    return <details className="mobile-drawer">
-      <summary aria-label="Open navigation menu"><Icon name="menu" size={20}/></summary>
-      <button type="button" className="mobile-drawer-backdrop" aria-label="Close navigation menu" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}/>
-      <nav className="mobile-drawer-panel" aria-label="All pages">
+    const pathname = usePathname();
+    return <MobileNavDrawerPanel key={pathname} staff={staff}/>;
+}
+
+function MobileNavDrawerPanel({ staff }: { staff: boolean }) {
+    const [open, setOpen] = useState(false);
+    useEffect(() => {
+        if (!open) return;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setOpen(false);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener('keydown', onKeyDown);
+        };
+    }, [open]);
+
+    return <div className={`mobile-drawer${open ? ' is-open' : ''}`}>
+      <button type="button" className="mobile-menu-button" aria-label={open ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={open} aria-controls="mobile-navigation-panel" onClick={() => setOpen(value => !value)}><Icon name="menu" size={25}/></button>
+      <button type="button" className="mobile-drawer-backdrop" aria-label="Close navigation menu" tabIndex={open ? 0 : -1} onClick={() => setOpen(false)} />
+      <div id="mobile-navigation-panel" className="mobile-drawer-panel" role="dialog" aria-modal="true" aria-label="Navigation menu" aria-hidden={!open} inert={!open}>
         <div className="mobile-drawer-heading"><strong>MDvoro</strong><span>Learn. Practice. Excel.</span></div>
-        <div className="nav mobile-drawer-links"><NavLinks staff closeOnNavigate/></div>
-      </nav>
-    </details>;
+        <nav className="nav mobile-drawer-links" aria-label="All pages"><NavLinks staff onNavigate={() => setOpen(false)}/></nav>
+      </div>
+    </div>;
 }
 

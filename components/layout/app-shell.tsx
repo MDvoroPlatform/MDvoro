@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/i18n/theme-toggle';
 import { getI18n } from '@/lib/i18n/server';
 import { PresenceHeartbeat } from '@/components/presence/presence-heartbeat';
 import { MDvoroLogo } from '@/components/layout/mdvoro-logo';
+import { HomeLogoLink } from '@/components/layout/home-logo-link';
 export async function AppShell({ children, userName, role, examLabel }: {
     children: ReactNode;
     userName?: string | null;
@@ -17,9 +18,9 @@ export async function AppShell({ children, userName, role, examLabel }: {
     const staff = ['super_admin', 'admin', 'editor', 'reviewer', 'support'].includes(role ?? '');
     return (<div className="shell">
       <aside className="sidebar" aria-label={m.nav.dashboard}>
-        <Link href="/dashboard" className="brand brand-image" aria-label="MDvoro home">
+        <HomeLogoLink className="brand brand-image">
           <MDvoroLogo />
-        </Link>
+        </HomeLogoLink>
         <PrimaryNav staff={staff}/>
         <div className="sidebar-spacer"/>
         <div className="sidebar-footer">{m.shell.learn}<br />{m.shell.serious}<div className="sidebar-legal-links"><Link href="/legal/privacy">Privacy</Link><Link href="/legal/cookies">Cookies</Link><Link href="/legal/terms">Terms</Link></div></div>
@@ -28,12 +29,12 @@ export async function AppShell({ children, userName, role, examLabel }: {
       <main className="main">
         <header className="topbar">
           <div className="topbar-mobile-controls">
-            <MobileNavDrawer staff={staff}/>
             <div className="topbar-mobile-brand">
-              <Link href="/dashboard" className="brand brand-image" aria-label="MDvoro home">
+              <HomeLogoLink className="brand brand-image">
                 <MDvoroLogo compact />
-              </Link>
+              </HomeLogoLink>
             </div>
+            <MobileNavDrawer staff={staff}/>
           </div>
           <div className="topbar-search">
             <label className="search" aria-label={m.common.search}>
