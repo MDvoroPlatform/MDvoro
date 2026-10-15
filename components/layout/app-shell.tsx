@@ -8,6 +8,7 @@ import { getI18n } from '@/lib/i18n/server';
 import { PresenceHeartbeat } from '@/components/presence/presence-heartbeat';
 import { MDvoroLogo } from '@/components/layout/mdvoro-logo';
 import { HomeLogoLink } from '@/components/layout/home-logo-link';
+import { MDvoroFooter } from '@/components/layout/mdvoro-footer';
 export async function AppShell({ children, userName, role, examLabel }: {
     children: ReactNode;
     userName?: string | null;
@@ -58,6 +59,7 @@ export async function AppShell({ children, userName, role, examLabel }: {
           </div>
         </header>
         <div>{children}</div>
+        <MDvoroFooter />
       </main>
       <PresenceHeartbeat />
     </div>);

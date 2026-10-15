@@ -11,6 +11,7 @@ declare global {
                 'expired-callback'?: () => void;
                 'error-callback'?: () => void;
                 theme?: 'auto' | 'light' | 'dark';
+                size?: 'normal' | 'compact' | 'flexible';
             }) => string;
             remove: (widgetId: string) => void;
         };
@@ -34,7 +35,8 @@ export function Turnstile({ onToken, onError }: {
             if (cancelled || !ref.current || !window.turnstile) return;
             widgetId.current = window.turnstile.render(ref.current, {
                 sitekey: SITE_KEY,
-                theme: 'auto',
+                theme: 'light',
+                size: 'compact',
                 callback: onToken,
                 'expired-callback': () => onError(),
                 'error-callback': () => onError(),
