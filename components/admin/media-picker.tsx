@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Image from 'next/image';
 
 type Media = {
     id: string;
@@ -14,7 +15,7 @@ type Media = {
 
 const uploadErrorMessages: Record<string, string> = {
     file_too_large: 'This image is over the 10 MB limit.',
-    unsupported_file_type: 'Choose a JPG, PNG, WebP, or GIF image.',
+    unsupported_file_type: 'Choose a JPG, PNG, WebP, GIF, or HEIC/HEIF image.',
     file_signature_mismatch: 'The file contents do not match a supported image. Choose a valid image.',
     preview_unavailable: 'The image could not be secured for preview. Check the media storage permissions and try again.',
     upload_failed: 'The image could not be uploaded. Check your connection and try again.',
@@ -63,7 +64,7 @@ export function MediaPicker({ media, selectedIds, canEdit, onChange }: {
             return;
         }
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'].includes(file.type)) {
-            setMessage('Choose a JPG, PNG, WebP, GIF, or iPhone HEIC image.');
+            setMessage('Choose a JPG, PNG, WebP, GIF, or iPhone HEIC/HEIF image.');
             return;
         }
         if (file.size > 10 * 1024 * 1024) {
@@ -140,7 +141,7 @@ export function MediaPicker({ media, selectedIds, canEdit, onChange }: {
       >
         <span className="question-image-dropzone-icon" aria-hidden="true">＋</span>
         <strong>{busy ? 'Uploading image…' : 'Drop an image here or click to choose'}</strong>
-        <span>JPG, PNG, WebP, GIF, or iPhone HEIC · up to 10 MB</span>
+        <span>JPG, PNG, WebP, GIF, or iPhone HEIC/HEIF · up to 10 MB</span>
         <span className="question-image-browse">Choose an image from your device</span>
       </button>
 
@@ -159,7 +160,7 @@ export function MediaPicker({ media, selectedIds, canEdit, onChange }: {
         <div className="question-image-selected-title">Attached images ({selectedIds.length})</div>
         <div className="question-image-thumbnails">
           {selected.map((asset) => <div className="question-image-thumb" key={asset.id}>
-            {(asset.url || asset.external_url) ? <img src={asset.url || asset.external_url || ''} alt={asset.title} /> : <span className="question-image-thumb-placeholder" aria-hidden="true">▧</span>}
+            {(asset.url || asset.external_url) ? <Image src={asset.url || asset.external_url || ''} alt={asset.title} width={120} height={90} unoptimized /> : <span className="question-image-thumb-placeholder" aria-hidden="true">▧</span>}
             <span title={asset.title}>{asset.title}</span>
             <button type="button" disabled={!canEdit} onClick={() => toggle(asset.id, false)} aria-label={`Remove ${asset.title}`}>Remove</button>
           </div>)}
@@ -169,7 +170,7 @@ export function MediaPicker({ media, selectedIds, canEdit, onChange }: {
       <div className="media-picker" aria-label="Image library results">
         {results.filter((asset) => isVisualMedia(asset) && !selectedIds.includes(asset.id)).slice(0, 12).map((asset) => <label className="media-pick" key={asset.id}>
           <input disabled={!canEdit} type="checkbox" checked={false} onChange={(event) => toggle(asset.id, event.target.checked)} />
-          {(asset.url || asset.external_url) ? <img src={asset.url || asset.external_url || ''} alt="" loading="lazy" /> : <span className="media-pick-placeholder" aria-hidden="true">▧</span>}
+          {(asset.url || asset.external_url) ? <Image src={asset.url || asset.external_url || ''} alt="" width={120} height={90} unoptimized loading="lazy" /> : <span className="media-pick-placeholder" aria-hidden="true">▧</span>}
           <span><b>{asset.title}</b><small>{asset.kind} · used {asset.usage_count ?? 0}× · {asset.copyright_status}</small></span>
         </label>)}
         {!results.length && <p className="media-picker-empty">No images in the library yet. Choose an image from your device to add one.</p>}
