@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { Route } from 'next';
 import { createClient } from '@/lib/supabase/client';
 
 type Mode = 'loading' | 'setup' | 'verify' | 'enroll' | 'blocked';
 
-export function AdminMfaSetup() {
+export function AdminMfaSetup({ returnTo = '/admin' }: { returnTo?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('loading');
   const [factorId, setFactorId] = useState('');
@@ -121,8 +122,8 @@ export function AdminMfaSetup() {
         setMessage('That code did not verify. Check your authenticator clock and try the current six-digit code.');
         return;
       }
-      setMessage('Authenticator verified. Opening the secure import page…');
-      router.replace('/admin/import');
+      setMessage('Authenticator verified. Opening Content Studio…');
+      router.replace(returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo as Route : '/admin');
       router.refresh();
     } catch {
       setMessage('Could not verify the code. Check your connection and try again.');

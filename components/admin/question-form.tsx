@@ -178,6 +178,14 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
         setBusy(false);
     }
     const status = form.workflowStatus ?? 'draft';
+    const filledOptions = form.options.filter((option) => option.text.trim());
+    const qualityChecks = [
+        ['Question text', Boolean(form.stem.trim())],
+        ['Two or more answer options', filledOptions.length >= 2],
+        ['Correct answer has text', filledOptions.some((option) => option.id === form.answerKey)],
+        ['Knowledge classification', selectedTaxonomy.length > 0],
+        ['Explanation added', Boolean(form.explanation.trim())],
+    ] as const;
     return <div className="editor-grid">
     <section className="card card-pad">
       <div className="form-section">
@@ -208,6 +216,7 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
       <section className="card card-pad question-live-preview"><div className="panel-title">Live preview</div><p className="preview-stem">{form.stem.trim() || 'Your question will appear here as you write.'}</p><ol type="A">{form.options.filter((option) => option.text.trim()).map((option) => <li key={option.id}>{option.text}{option.id === form.answerKey ? <span className="preview-correct">Correct answer</span> : null}</li>)}</ol>{form.explanation.trim() && <div className="preview-explanation"><strong>Explanation</strong><p>{form.explanation}</p></div>}</section>
       <section className="card card-pad"><div className="panel-title">Reusable media</div><p className="panel-sub media-help">Search the library instead of uploading duplicates. One image or ECG can safely serve hundreds of questions.</p><MediaPicker media={media} selectedIds={form.mediaIds} canEdit={canEdit} onChange={(mediaIds) => update({ mediaIds })}/><a className="btn" href="/admin/media">Open media library</a></section>
       <section className="card card-pad"><div className="panel-title">Publishing</div><div className="security-note">{canPublishDirect ? 'Admin publishing is immediate and does not require independent medical review. Each change is versioned and audited.' : 'Answers stay behind the server boundary. Editors can submit drafts to the review queue.'}</div></section>
+      <section className="card card-pad admin-authoring-checklist"><div className="panel-head"><div><div className="panel-title">Authoring checklist</div><div className="panel-sub">Completeness guidance only; it does not verify medical accuracy.</div></div></div><ul>{qualityChecks.map(([label, complete])=><li key={label} className={complete ? 'is-complete' : ''}><span aria-hidden="true">{complete ? '✓' : '○'}</span>{label}</li>)}</ul><div className="authoring-checklist-note">{form.mediaIds.length ? `${form.mediaIds.length} reusable media item${form.mediaIds.length === 1 ? '' : 's'} attached.` : 'Add reusable images or diagrams when the question needs them.'}</div></section>
     </aside>
   </div>;
 }

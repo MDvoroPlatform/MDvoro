@@ -8,7 +8,8 @@ import { AdminMfaSetup } from '@/components/account/admin-mfa-setup';
 import { LocaleSwitcher } from '@/components/i18n/locale-switcher';
 import { ThemeToggle } from '@/components/i18n/theme-toggle';
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ security?: string }> }) {
+    const params = await searchParams;
     const { messages: m } = await getI18n();
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -19,8 +20,12 @@ export default async function SettingsPage() {
         supabase.from('exams').select('id,code,name').order('name'),
     ]);
 
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+    const needsAdminMfa = isAdmin && params.security === 'mfa_required';
     return <div className="page">
       <div className="page-head"><div><div className="eyebrow">{m.settings.eyebrow}</div><h1>{m.settings.title}</h1><p className="subtitle">{m.settings.subtitle}</p></div></div>
+      {needsAdminMfa && <section className="admin-mfa-gate card card-pad" aria-labelledby="admin-mfa-gate-title"><span className="admin-mfa-gate-icon" aria-hidden="true">🔐</span><div><h2 id="admin-mfa-gate-title">Secure your administrator access</h2><p>Content Studio requires an authenticator code for administrator accounts. Set it up here once, then you can return to Content Studio.</p></div></section>}
+      {needsAdminMfa && <div className="settings-admin-security"><AdminMfaSetup returnTo="/admin"/></div>}
       <div className="grid grid-3 settings-preferences-grid">
         <section className="card card-pad settings-preference-card">
           <div className="kicker">{m.settings.identity}</div><h2 className="section-heading">{m.settings.profile}</h2>
@@ -34,7 +39,7 @@ export default async function SettingsPage() {
         <section className="card card-pad settings-preference-card"><div className="kicker">{m.settings.preferences}</div><h2 className="section-heading">{m.settings.appearance}</h2><p className="panel-sub">{m.settings.appearanceHelp}</p><div className="settings-appearance-control"><span>{m.settings.darkMode}</span><ThemeToggle /></div></section>
         <section className="card card-pad settings-preference-card"><div className="kicker">{m.settings.session}</div><h2 className="section-heading">{m.settings.signOut}</h2><p className="panel-sub field-note-bottom">{m.settings.endSession}</p><SignOutButton /></section>
       </div>
-      {profile?.role === 'admin' || profile?.role === 'super_admin' ? <div className="settings-danger-card"><AdminMfaSetup /></div> : null}
+      {isAdmin && !needsAdminMfa ? <div className="settings-danger-card"><AdminMfaSetup returnTo="/admin"/></div> : null}
       <section className="card card-pad settings-danger-card"><div className="kicker">Privacy</div><h2 className="section-heading">Account deletion</h2><p className="panel-sub">Permanently remove your account and associated learning records.</p><DeleteAccountButton /></section>
     </div>;
 }
