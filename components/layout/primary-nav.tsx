@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/icons';
 import { useI18n } from '@/components/i18n/provider';
+import { MDvoroLogo } from '@/components/layout/mdvoro-logo';
 const NAV_ITEMS = [
     ['/dashboard', 'dashboard', 'grid'],
     ['/qbank', 'qbank', 'book'],
@@ -61,13 +62,21 @@ function MobileNavItems() {
     </>;
 }
 
-export function MobileNavDrawer({ staff }: { staff: boolean }) {
+export function MobileNavDrawer({ staff, userName }: { staff: boolean; userName?: string | null }) {
     const pathname = usePathname();
-    return <MobileNavDrawerPanel key={pathname} staff={staff}/>;
+    return <MobileNavDrawerPanel key={pathname} staff={staff} userName={userName}/>;
 }
 
-function MobileNavDrawerPanel({ staff }: { staff: boolean }) {
+function MobileNavDrawerPanel({ staff, userName }: { staff: boolean; userName?: string | null }) {
     const [open, setOpen] = useState(false);
+    const pathname = usePathname();
+    const { messages, locale } = useI18n();
+    const progressCopy = ({
+        en: { small: 'Small steps...', big: 'Big progress' },
+        he: { small: 'צעדים קטנים...', big: 'התקדמות גדולה' },
+        ar: { small: 'خطوات صغيرة...', big: 'تقدم كبير' },
+        ru: { small: 'Маленькие шаги...', big: 'Большой прогресс' },
+    } as const)[locale];
     useEffect(() => {
         if (!open) return;
         const previousOverflow = document.body.style.overflow;
@@ -86,9 +95,53 @@ function MobileNavDrawerPanel({ staff }: { staff: boolean }) {
       <button type="button" className="mobile-menu-button" aria-label={open ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={open} aria-controls="mobile-navigation-panel" onClick={() => setOpen(value => !value)}><Icon name="menu" size={25}/></button>
       <button type="button" className="mobile-drawer-backdrop" aria-label="Close navigation menu" tabIndex={open ? 0 : -1} onClick={() => setOpen(false)} />
       <div id="mobile-navigation-panel" className="mobile-drawer-panel" role="dialog" aria-modal="true" aria-label="Navigation menu" aria-hidden={!open} inert={!open}>
-        <div className="mobile-drawer-heading"><strong>MDvoro</strong><span>Learn. Practice. Excel.</span></div>
-        <nav className="nav mobile-drawer-links" aria-label="All pages"><NavLinks staff onNavigate={() => setOpen(false)}/></nav>
+        <div className="mobile-drawer-heading">
+          <Link href="/dashboard" className="mobile-drawer-logo" aria-label="MDvoro home" onClick={() => setOpen(false)}><MDvoroLogo /></Link>
+          <button type="button" className="mobile-drawer-close" aria-label="Close navigation menu" onClick={() => setOpen(false)}><Icon name="chevron-left" size={20}/></button>
+        </div>
+        <Link href="/settings" className="mobile-drawer-profile" onClick={() => setOpen(false)}>
+          <span className="mobile-drawer-avatar"><Icon name="user" size={27}/></span>
+          <span className="mobile-drawer-profile-copy"><span>{messages.auth.welcome},</span><strong>{userName?.trim() || messages.shell.student}</strong></span>
+          <Icon name="chevron-right" size={20}/>
+        </Link>
+        <nav className="mobile-drawer-nav" aria-label="All pages">
+          <div className="nav mobile-drawer-links">
+            {NAV_ITEMS.slice(0, 6).map(([href, key, icon]) => <DrawerNavLink key={href} href={href} labelKey={key} icon={icon} onNavigate={() => setOpen(false)}/>)}
+            <DrawerNavLink href="/leaderboard" labelKey="leaderboard" icon="trophy" onNavigate={() => setOpen(false)}/>
+          </div>
+          <div className="mobile-drawer-divider" />
+          <div className="nav mobile-drawer-links">
+            {NAV_ITEMS.slice(7, 10).map(([href, key, icon]) => <DrawerNavLink key={href} href={href} labelKey={key} icon={icon} onNavigate={() => setOpen(false)}/>)}
+          </div>
+          <div className="mobile-drawer-divider" />
+          <div className="nav mobile-drawer-links">
+            <DrawerNavLink href="/settings" labelKey="settings" icon="settings" onNavigate={() => setOpen(false)}/>
+            {staff && <Link href="/admin" onClick={() => setOpen(false)} className={isActive(pathname, '/admin') ? 'active' : undefined} aria-current={isActive(pathname, '/admin') ? 'page' : undefined}><span className="mobile-drawer-icon"><Icon name="shield" size={21}/></span><span>{messages.nav.contentStudio}</span><Icon name="chevron-right" size={19}/></Link>}
+          </div>
+        </nav>
+        <div className="mobile-drawer-progress">
+          <span className="mobile-drawer-progress-accent" />
+          <Icon name="graduation" size={27}/>
+          <span className="mobile-drawer-progress-copy"><span>{progressCopy.small}</span><strong>{progressCopy.big}</strong></span>
+          <Icon name="trend-up" size={21}/>
+        </div>
       </div>
     </div>;
+}
+
+function DrawerNavLink({ href, labelKey, icon, onNavigate }: { href: typeof NAV_ITEMS[number][0]; labelKey: string; icon: typeof NAV_ITEMS[number][2] | 'trophy'; onNavigate: () => void }) {
+    const pathname = usePathname();
+    const { messages, locale } = useI18n();
+    const active = isActive(pathname, href);
+    const label = labelKey === 'notebook'
+        ? ({ en: 'Notebook', he: 'מחברת', ar: 'مذكرتي', ru: 'Блокнот' } as const)[locale]
+        : labelKey === 'examGuide'
+            ? ({ en: 'Exam Guide', he: 'מדריך הבחינה', ar: 'دليل الامتحان', ru: 'Гид по экзамену' } as const)[locale]
+            : labelKey === 'leaderboard'
+                ? ({ en: 'Leaderboard', he: 'לוח מובילים', ar: 'لوحة المتصدرين', ru: 'Таблица лидеров' } as const)[locale]
+                : messages.nav[labelKey as keyof typeof messages.nav];
+    return <Link href={href} onClick={onNavigate} className={active ? 'active' : undefined} aria-current={active ? 'page' : undefined}>
+      <span className="mobile-drawer-icon"><Icon name={icon} size={21}/></span><span>{label}</span><Icon name="chevron-right" size={19}/>
+    </Link>;
 }
 

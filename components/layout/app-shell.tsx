@@ -35,7 +35,7 @@ export async function AppShell({ children, userName, role, examLabel }: {
                 <MDvoroLogo compact />
               </HomeLogoLink>
             </div>
-            <MobileNavDrawer staff={staff}/>
+            <MobileNavDrawer staff={staff} userName={userName}/>
           </div>
           <div className="topbar-search">
             <label className="search" aria-label={m.common.search}>

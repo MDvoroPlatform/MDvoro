@@ -4,7 +4,7 @@ type IconProps = {
 };
 const base = (p: IconProps) => ({ width: p.size ?? 18, height: p.size ?? 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: p.stroke ?? 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true });
 export function Icon({ name, ...p }: IconProps & {
-    name: 'grid' | 'book' | 'cards' | 'calendar' | 'chart' | 'settings' | 'search' | 'bell' | 'arrow' | 'target' | 'brain' | 'check' | 'shield' | 'logout' | 'plus' | 'clock' | 'spark' | 'eye' | 'globe' | 'moon' | 'sun' | 'bookmark' | 'trophy' | 'menu' | 'mail' | 'lock' | 'graduation' | 'trending';
+    name: 'grid' | 'book' | 'cards' | 'calendar' | 'chart' | 'settings' | 'search' | 'bell' | 'arrow' | 'chevron-left' | 'chevron-right' | 'user' | 'target' | 'brain' | 'check' | 'shield' | 'logout' | 'plus' | 'clock' | 'spark' | 'eye' | 'globe' | 'moon' | 'sun' | 'bookmark' | 'trophy' | 'menu' | 'mail' | 'lock' | 'graduation' | 'trending' | 'trend-up';
 }) {
     const a = base(p);
     const paths: Record<string, React.ReactNode> = {
@@ -17,6 +17,9 @@ export function Icon({ name, ...p }: IconProps & {
         search: <><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></>,
         bell: <><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
         arrow: <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>,
+        'chevron-left': <path d="m15 18-6-6 6-6"/>,
+        'chevron-right': <path d="m9 18 6-6-6-6"/>,
+        user: <><circle cx="12" cy="8" r="3.25"/><path d="M4.5 20c.5-3.5 3.4-5.5 7.5-5.5s7 2 7.5 5.5"/></>,
         target: <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="m12 12 6-6"/></>,
         brain: <><path d="M9 4a3 3 0 0 0-3 3v1a3 3 0 0 0-2 5 3 3 0 0 0 3 4h2v-4a3 3 0 0 0 0-6V4z"/><path d="M15 4a3 3 0 0 1 3 3v1a3 3 0 0 1 2 5 3 3 0 0 1-3 4h-2v-4a3 3 0 0 1 0-6V4z"/><path d="M12 4v16"/></>,
         check: <><path d="m5 12 4 4L19 6"/></>,
@@ -34,6 +37,7 @@ export function Icon({ name, ...p }: IconProps & {
         lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3M12 14v3"/></>,
         graduation: <><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c3.5 3 8.5 3 12 0v-5M22 9v6"/></>,
         trending: <><path d="M3 17 9 11l4 4 8-9"/><path d="M15 6h6v6"/></>,
+        'trend-up': <><path d="m4 16 6-6 4 3 6-7"/><path d="M15 6h5v5"/></>,
         moon: <><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5a8.5 8.5 0 1 0 12 12z"/></>,
         sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>
     };
