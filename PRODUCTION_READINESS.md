@@ -51,6 +51,20 @@ The 5,000-request probe confirms the local production server eventually returned
 
 The latest full and production dependency audits both report zero vulnerabilities. Re-run the audits before each production release because advisory status changes over time.
 
+## Admin dashboard and visual verification (2026-10-19)
+
+- Added an activity chart and subject breakdown using the latest 100 real question records returned by the staff-only database RPC. The dashboard labels the sample window so the charts do not imply a complete historical report.
+- Added a recent audit activity widget for administrators and a live authoring completeness checklist in the question editor. The checklist explicitly does not claim to verify medical accuracy.
+- Reworked dark-system-mode behavior so Content Studio consistently uses the reference light design and the original dark-letter transparent MDvoro logo on its white admin surfaces. The original light/dark logo PNG assets retain alpha transparency.
+- Improved the MFA-required redirect: the Settings page now explains why Content Studio needs authenticator protection and surfaces enrollment immediately. Completing verification returns the administrator to Content Studio.
+- Read-only review of the live authenticated admin dashboard and question editor was completed at the in-app browser's current 550 CSS-pixel viewport. The editor, logo and new widgets rendered with readable text and no visible horizontal clipping. The browser's viewport override did not change its fixed 550-pixel viewport, so this is not a claim of live authenticated testing at every device width.
+- Local `npm run verify` after the final contrast fix: PASS. Static contracts and RLS source checks passed; `npm audit --omit=dev --audit-level=high` found 0 vulnerabilities; ESLint and TypeScript passed; Vitest passed 10/10 tests; Next.js production build passed. The enterprise style check continues to print existing long-line warnings in unrelated files.
+- Playwright browser run: 15 passed and 7 intentionally skipped by the configured Chromium/iPhone projects. It checks public/auth layouts at 320–1440 CSS pixels and anonymous access boundaries; it does not log in as a test administrator. GitHub Actions run #53 for commit `4d42e2d` completed successfully after these changes.
+- Netlify production deployment `6ad67edde21f5c2ab12d537a` published commit `4d42e2d` to the custom domain `https://mdvoro.com`.
+- GitHub main now contains the admin dashboard, design, logo and MFA redirect fixes. No environment file or Supabase secret was staged or committed.
+
+These UI improvements do not clear the separate release blockers below. In particular, custom SMTP/email delivery, operator/legal details, verified backups/recovery, independent production security review and representative hosted load testing remain unverified. The project must not be described as fully production-ready until those gates are resolved.
+
 ## Application changes from the latest browser checks
 
 - Protected student and admin page navigation now checks the verified session claims in Proxy and redirects anonymous visitors to `/login` before streaming the page shell. The page layouts, server authorization checks, MFA gates, and API checks remain in place.
