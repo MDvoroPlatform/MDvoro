@@ -1,11 +1,20 @@
 import { expect, test } from '@playwright/test';
 
 async function installTurnstileStub(page: import('@playwright/test').Page) {
-  await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js**', route => route.fulfill({
+  await page.route(/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js/, route => route.fulfill({
     status: 200,
     contentType: 'application/javascript',
     body: `window.turnstile = { render: (_element, options) => { queueMicrotask(() => options.callback('test-captcha-token')); return 'test-widget'; }, remove: () => {} };`,
   }));
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'turnstile', { configurable: false, value: {
+      render: (_element: HTMLElement, options: { callback: (token: string) => void }) => {
+        queueMicrotask(() => options.callback('test-captcha-token'));
+        return 'test-widget';
+      },
+      remove: () => {},
+    } });
+  });
 }
 
 test('student and admin pages redirect anonymous visitors to sign in', async ({ page }) => {
@@ -26,6 +35,7 @@ test('login links to password recovery and sends the reset request without revea
   await page.getByRole('link', { name: 'Forgot your password?' }).click();
   await expect(page).toHaveURL(/\/forgot-password$/);
   await page.getByRole('textbox', { name: 'Email' }).fill('student@example.com');
+  await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled();
   const resetRequest = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/auth/v1/recover'));
   await page.getByRole('button', { name: 'Save' }).click();
   const request = await resetRequest;
@@ -46,6 +56,7 @@ test('password login sends Turnstile token to Supabase Auth', async ({ page, bro
   await page.goto('/login');
   await page.getByRole('textbox', { name: 'Email address' }).fill('student@example.com');
   await page.getByRole('textbox', { name: 'Password' }).fill('not-a-real-password');
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeEnabled();
   const authRequest = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/auth/v1/token'));
   await page.getByRole('button', { name: 'Sign in' }).click();
   const request = await authRequest;

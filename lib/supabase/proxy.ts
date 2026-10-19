@@ -11,6 +11,20 @@ function isProtectedPage(pathname: string) {
     return protectedPageRoots.some((root) => pathname === root || pathname.startsWith(`${root}/`));
 }
 
+function supabaseConnectSources() {
+    const configuredUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!configuredUrl) return '';
+    try {
+        const url = new URL(configuredUrl);
+        const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+        if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopback)) return '';
+        const socketProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${url.origin} ${socketProtocol}//${url.host}`;
+    } catch {
+        return '';
+    }
+}
+
 function securityPolicy(nonce: string) {
     return [
         "default-src 'self'",
@@ -18,7 +32,7 @@ function securityPolicy(nonce: string) {
         `style-src 'self' 'nonce-${nonce}'`,
         "img-src 'self' data: blob: https://*.supabase.co https://challenges.cloudflare.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com",
+        `connect-src 'self' https://*.supabase.co wss://*.supabase.co ${supabaseConnectSources()} https://challenges.cloudflare.com`,
         "frame-src 'self' https://challenges.cloudflare.com",
         "worker-src 'self' blob:",
         "manifest-src 'self'",
