@@ -1,4 +1,4 @@
-import { requireSuperAdmin } from '@/lib/server/authorization';
+import { requireAdmin } from '@/lib/server/authorization';
 import { ExamProfileEditor } from '@/components/admin/exam-profile-editor';
 
 type ExamProfile = {
@@ -19,7 +19,7 @@ type ExamProfile = {
 type ExamRow = { id: string; code: string; name: string; description: string | null; profile: ExamProfile | null };
 
 export default async function AdminExamsPage() {
-  const { supabase } = await requireSuperAdmin();
+  const { supabase } = await requireAdmin();
   const { data: exams } = await supabase.from('exams').select('id,code,name,description').order('name');
   const rows: ExamRow[] = [];
   for (const exam of exams ?? []) {
@@ -30,7 +30,7 @@ export default async function AdminExamsPage() {
     <div className="admin-page">
       <div className="admin-page-head">
         <div>
-          <div className="eyebrow">Super administrator</div>
+          <div className="eyebrow">Administrator</div>
           <h1>Exam profiles</h1>
           <p className="subtitle">Change exam timing and delivery rules without changing application code.</p>
         </div>

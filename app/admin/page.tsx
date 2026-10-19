@@ -35,7 +35,7 @@ export default async function AdminOverview() {
       <div className="card card-pad"><div className="metric-label">Media assets</div><div className="metric-value">{c.media_assets ?? 0}</div><div className="metric-note">Reusable clinical media</div></div>
     </div>
     <section className="card card-pad admin-section-gap">
-      <div className="panel-head"><div><div className="panel-title">Content pipeline</div><div className="panel-sub">Draft → medical review → published</div></div><Link className="muted-link" href="/admin/questions">Open questions</Link></div>
+      <div className="panel-head"><div><div className="panel-title">Content pipeline</div><div className="panel-sub">Drafts → review queue or direct admin publish → published</div></div><Link className="muted-link" href="/admin/questions">Open questions</Link></div>
       <div className="pipeline"><div><strong>{c.draft_questions ?? 0}</strong><span>Drafts</span></div><div><strong>{c.in_review_questions ?? 0}</strong><span>In medical review</span></div><div><strong>{c.published_questions ?? 0}</strong><span>Published</span></div></div>
     </section>
     <section className="card card-pad admin-section-gap"><div className="panel-head"><div><div className="panel-title">Latest content</div><div className="panel-sub">Stable content codes make support and future AI edits safer.</div></div><Link className="muted-link" href="/admin/questions">View all</Link></div><div className="admin-mini-list">{recentQuestions.map((q) => <Link key={q.id} href={`/admin/questions/${q.id}`}><span><b>{q.id}</b><small>{q.subject} · {q.topic || 'General'}</small></span><Icon name="arrow" size={15}/></Link>)}</div></section>

@@ -54,7 +54,7 @@ export default function ImportPage() {
       <textarea className="import-editor" rows={22} value={text} onChange={(e) => setText(e.target.value)} placeholder={format === 'json' ? example : 'examId,stem,subject,topic,option_a,option_b,option_c,option_d,option_e,answerKey,explanation,keyLearningPoint,difficulty\nUUID,Clinical question…,Internal Medicine,Cardiology,A…,B…,C…,D…,E…,B,Explanation…,Takeaway…,3'}/>
       <div className="form-actions"><button className="btn btn-primary" disabled={busy || !text.trim()} onClick={run}>{busy ? 'Validating & importing…' : 'Validate & import as drafts'}</button>{message && <span className="form-message">{message}</span>}</div>
     </section>
-    <section className="card card-pad admin-section-gap"><div className="panel-title">Safe by default</div><p className="panel-sub import-note">Maximum 2,000 rows per transaction. Invalid rows are rejected before import. Every question gets a stable content code, version 1, an audit event and Draft status. Publishing always requires medical review.</p></section>
+    <section className="card card-pad admin-section-gap"><div className="panel-title">Import details</div><p className="panel-sub import-note">Maximum 2,000 rows per transaction. Invalid rows are rejected before import. Every question gets a stable content code, version 1, an audit event and Draft status. Administrators can publish imported questions directly from the question editor.</p></section>
   </div>;
 }
 

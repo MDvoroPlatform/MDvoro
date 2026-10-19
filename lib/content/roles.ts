@@ -1,5 +1,5 @@
 export const ROLE_LABELS = {
-    super_admin: 'Super administrator',
+    super_admin: 'Administrator',
     admin: 'Administrator',
     editor: 'Content editor',
     reviewer: 'Medical reviewer',
@@ -7,8 +7,8 @@ export const ROLE_LABELS = {
     student: 'Student',
 } as const;
 export const ROLE_HELP = {
-    super_admin: 'Full platform control, including security, users, revenue and system operations.',
-    admin: 'Full product, content and team control except super-administrator governance.',
+    super_admin: 'Legacy administrator role with the same full authority as Administrator.',
+    admin: 'Highest product administrator with full content, team, user, exam, system and platform permissions.',
     editor: 'Creates and edits drafts and reusable media.',
     reviewer: 'Reviews and publishes medical content.',
     support: 'Support access without editorial publishing rights.',

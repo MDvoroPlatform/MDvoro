@@ -43,4 +43,6 @@ export const requireContentReviewer = () => requireRole(CONTENT_REVIEWER_ROLES);
 export const requireAdmin = () => requireRole(ADMIN_ROLES);
 
 
-export const requireSuperAdmin = () => requireRole(['super_admin'] as const);
+// Backward-compatible alias: admin is the highest product authority; the
+// legacy super_admin role remains equivalent while existing accounts migrate.
+export const requireSuperAdmin = () => requireAdmin();

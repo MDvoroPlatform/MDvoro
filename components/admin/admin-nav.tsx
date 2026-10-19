@@ -33,7 +33,7 @@ export function AdminNav({ role }: {
 }) {
     const pathname = usePathname();
     return (<nav className="admin-nav" aria-label="Content Studio">
-      {items.filter((item) => (!item.adminOnly || role === 'admin' || role === 'super_admin') && (!item.systemOnly || role === 'super_admin') && (!item.reviewerOnly || role === 'super_admin' || role === 'admin' || role === 'reviewer')).map((item) => {
+      {items.filter((item) => (!item.adminOnly || role === 'admin' || role === 'super_admin') && (!item.systemOnly || role === 'admin' || role === 'super_admin') && (!item.reviewerOnly || role === 'super_admin' || role === 'admin' || role === 'reviewer')).map((item) => {
             const active = item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href);
             return (<Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')} className={active ? 'active' : undefined}>
             <Icon name={item.icon} size={17}/>
