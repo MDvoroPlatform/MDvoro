@@ -89,10 +89,12 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
             setBusy(false);
             return;
         }
+        const savedQuestionId = form.id || body.id;
+        if (savedQuestionId) update({ id: savedQuestionId, workflowStatus: 'draft' });
         setMessage('Saved as draft.');
         let relatedUpdatesSucceeded = true;
         if (body.id || form.id) {
-            const questionId = form.id || body.id;
+            const questionId = savedQuestionId;
             const taxonomyResponse = await fetch('/api/admin/questions/taxonomy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId, taxonomyIds: selectedTaxonomy }) });
             if (!taxonomyResponse.ok) {
                 relatedUpdatesSucceeded = false;
@@ -100,7 +102,7 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
             }
         }
         if (body.id || form.id) {
-            const questionId = form.id || body.id;
+            const questionId = savedQuestionId;
             const keyTermsResponse = await fetch('/api/admin/questions/key-terms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId, terms: form.keyTerms ?? [] }) });
             if (!keyTermsResponse.ok) {
                 relatedUpdatesSucceeded = false;
@@ -112,14 +114,14 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
                 setMessage('Draft saved, but reconstruction labeling could not be updated.');
             }
         }
-        if (publishNow && canPublishDirect && relatedUpdatesSucceeded && (body.id || form.id)) {
+        if (publishNow && canPublishDirect && relatedUpdatesSucceeded && savedQuestionId) {
             const publishResponse = await fetch('/api/admin/questions/publish', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ questionId: form.id || body.id }),
+                body: JSON.stringify({ questionId: savedQuestionId }),
             });
             if (publishResponse.ok) {
-                update({ id: form.id || body.id, workflowStatus: 'published' });
+                update({ workflowStatus: 'published' });
                 setMessage('Published directly. No independent medical review was performed.');
             } else {
                 setMessage('Saved as a draft, but direct publishing failed. Please try again.');

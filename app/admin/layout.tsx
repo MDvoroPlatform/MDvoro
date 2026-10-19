@@ -31,7 +31,7 @@ export default async function AdminLayout({ children }: {
       <div className="sidebar-spacer"/>
       <div className="admin-role"><span>Signed in as</span><strong>{resolvedContext.user.user_metadata?.full_name || resolvedContext.user.email}</strong><small>{resolvedContext.role}</small></div>
     </aside>
-    <main className="admin-main"><header className="admin-topbar"><div><span className="admin-kicker">MDvoro</span><strong>Medical Content Studio</strong></div><AdminMobileNav role={resolvedContext.role}/><Link className="btn" href="/dashboard">Back to app</Link></header>{children}</main>
+    <main className="admin-main"><header className="admin-topbar"><div className="admin-topbar-title"><span className="admin-kicker">MDvoro</span><strong>Medical Content Studio</strong></div><Link href="/admin" className="admin-topbar-brand" aria-label="MDvoro"><MDvoroLogo/></Link><AdminMobileNav role={resolvedContext.role}/><Link className="btn" href="/dashboard">Back to app</Link></header>{children}</main>
   </div>;
 }
 

@@ -1207,6 +1207,11 @@ html.dark .mobile-drawer-links a.active .mobile-drawer-icon, html[data-theme="da
 .admin-role { margin-top: 14px; border-top-color: #e6edf6; }
 .admin-role span,.admin-role small { color: #7c8ca3; }
 .admin-topbar { border-bottom-color: #e4ebf5; }
+.admin-topbar-brand { display: none; width: 132px; flex: 0 1 132px; }
+.admin-topbar-brand .mdvoro-logo { width: 100%; height: auto; aspect-ratio: 880 / 167; }
+.admin-topbar-brand .mdvoro-logo img { width: 100%; height: 100%; object-fit: contain; }
+.admin-topbar-brand .mdvoro-logo-light { display: block !important; }
+.admin-topbar-brand .mdvoro-logo-dark { display: none !important; }
 .admin-page-head h1 { color: #10244a; letter-spacing: -.035em; }
 .admin-metrics { grid-template-columns: repeat(4,minmax(0,1fr)); }
 .admin-operations-metrics { margin-top: 14px; }
@@ -1227,6 +1232,8 @@ html.dark .mobile-drawer-links a.active .mobile-drawer-icon, html[data-theme="da
 @media (max-width: 820px) {
   .admin-brand { width: 148px; margin: 0; }
   .admin-topbar { display: flex; }
+  .admin-topbar-title { display: none !important; }
+  .admin-topbar-brand { display: block; }
   .admin-topbar > .btn { margin-inline-start: 0; }
   .admin-metrics,.admin-operations-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .question-live-preview { position: static; }
