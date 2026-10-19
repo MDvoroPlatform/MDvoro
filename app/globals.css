@@ -1216,6 +1216,12 @@ html.dark .mobile-drawer-links a.active .mobile-drawer-icon, html[data-theme="da
 .admin-metrics { grid-template-columns: repeat(4,minmax(0,1fr)); }
 .admin-operations-metrics { margin-top: 14px; }
 .admin-operations-metrics .metric-value { font-size: 23px; }
+.admin-dashboard-lower { align-items: stretch; }
+.admin-quick-actions { display: grid; gap: 4px; }
+.admin-quick-actions a { display: grid; grid-template-columns: 22px minmax(0,1fr) 18px; align-items: center; gap: 10px; min-height: 46px; padding: 7px 9px; border-bottom: 1px solid var(--line); color: #405875; font-size: 12px; font-weight: 650; text-decoration: none; }
+.admin-quick-actions a:last-child { border-bottom: 0; }
+.admin-quick-actions a:hover { border-radius: 10px; background: #f3f7fd; color: #1267d4; }
+.admin-quick-actions a svg:last-child { color: #8b9ab0; }
 .option-row { grid-template-columns: 34px minmax(0,1fr) auto auto; min-width: 0; }
 .option-row > input:not(.radio) { min-width: 0; }
 .correct-answer { display: inline-flex; align-items: center; gap: 6px; color: #159d82; font-size: 11px; white-space: nowrap; }

@@ -11,6 +11,6 @@ export default async function NewQuestionPage() {
     if (!exams?.length)
         redirect('/admin');
     const isAdmin = context.role === 'admin' || context.role === 'super_admin';
-    return <div className="admin-page"><div className="admin-page-head"><div><div className="eyebrow">Create content</div><h1>New question</h1><p className="subtitle">{isAdmin ? 'Create and publish directly. Independent medical review is not required.' : 'Create a draft and submit it to the medical review queue.'}</p></div></div><QuestionForm exams={exams} media={media ?? []} canPublishDirect={isAdmin}/></div>;
+    return <div className="admin-page"><div className="admin-page-head"><div><div className="eyebrow">Create content</div><h1>New question</h1><p className="subtitle">{isAdmin ? 'Save as a draft or publish directly. Independent medical review is not required for administrators.' : 'Create a draft and submit it to the medical review queue.'}</p></div></div><QuestionForm exams={exams} media={media ?? []} canPublishDirect={isAdmin}/></div>;
 }
 

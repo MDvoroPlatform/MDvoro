@@ -11,7 +11,7 @@ type Counts = {
     review_events: number;
 };
 export default async function AdminOverview() {
-    const { supabase } = await requireStaff();
+    const { supabase, user, role } = await requireStaff();
     const [{ data: counts }, { data: recent }, { data: ops }] = await Promise.all([
         supabase.rpc('admin_content_counts'),
         supabase.rpc('admin_list_questions', { p_limit: 8, p_offset: 0 }),
@@ -20,8 +20,10 @@ export default async function AdminOverview() {
     const c = (counts?.[0] ?? {}) as Partial<Counts>;
     const metrics = (ops ?? {}) as Record<string, unknown>;
     const recentQuestions = (recent ?? []) as unknown as Array<{ id: string; subject: string; topic: string | null }>;
+    const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Staff';
+    const canManageUsers = role === 'admin' || role === 'super_admin';
     return <div className="admin-page">
-    <div className="admin-page-head"><div><div className="eyebrow">Secure content operations</div><h1>Content Studio</h1><p className="subtitle">One simple workspace for authoring, media, review and publication.</p></div><Link className="btn btn-primary" href="/admin/questions/new"><Icon name="plus" size={15}/> New question</Link></div>
+    <div className="admin-page-head"><div><div className="eyebrow">Secure content operations</div><h1>Good morning, {displayName}</h1><p className="subtitle">Here’s what’s happening across your platform today.</p></div><Link className="btn btn-primary" href="/admin/questions/new"><Icon name="plus" size={15}/> New question</Link></div>
     <div className="grid grid-4 admin-metrics">
       <div className="card card-pad"><div className="metric-label">Total questions</div><div className="metric-value">{c.total_questions ?? 0}</div><div className="metric-note">All content records</div></div>
       <div className="card card-pad"><div className="metric-label">Published</div><div className="metric-value">{c.published_questions ?? 0}</div><div className="metric-note">Available to learners</div></div>
@@ -37,7 +39,10 @@ export default async function AdminOverview() {
       <div className="panel-head"><div><div className="panel-title">Content pipeline</div><div className="panel-sub">Drafts → review queue or direct admin publish → published</div></div><Link className="muted-link" href="/admin/questions">Open questions</Link></div>
       <div className="pipeline"><div><strong>{c.draft_questions ?? 0}</strong><span>Drafts</span></div><div><strong>{c.in_review_questions ?? 0}</strong><span>In medical review</span></div><div><strong>{c.published_questions ?? 0}</strong><span>Published</span></div></div>
     </section>
-    <section className="card card-pad admin-section-gap"><div className="panel-head"><div><div className="panel-title">Latest content</div><div className="panel-sub">Stable content codes make support and future AI edits safer.</div></div><Link className="muted-link" href="/admin/questions">View all</Link></div><div className="admin-mini-list">{recentQuestions.map((q) => <Link key={q.id} href={`/admin/questions/${q.id}`}><span><b>{q.id}</b><small>{q.subject} · {q.topic || 'General'}</small></span><Icon name="arrow" size={15}/></Link>)}</div></section>
+    <div className="grid grid-main admin-dashboard-lower admin-section-gap">
+      <section className="card card-pad"><div className="panel-head"><div><div className="panel-title">Recent questions</div><div className="panel-sub">Latest records from the question bank.</div></div><Link className="muted-link" href="/admin/questions">View all</Link></div><div className="admin-mini-list">{recentQuestions.length ? recentQuestions.map((q) => <Link key={q.id} href={`/admin/questions/${q.id}`}><span><b>{q.subject || 'Untitled question'}</b><small>{q.topic || 'General'} · {q.id.slice(0, 8)}</small></span><Icon name="arrow" size={15}/></Link>) : <div className="empty-panel"><b>No questions yet</b><span>Create your first question to populate this list.</span></div>}</div></section>
+      <section className="card card-pad"><div className="panel-head"><div><div className="panel-title">Quick actions</div><div className="panel-sub">Shortcuts to real administration tools.</div></div></div><div className="admin-quick-actions"><Link href="/admin/questions/new"><Icon name="plus" size={17}/>Add new question<Icon name="arrow" size={15}/></Link><Link href="/admin/taxonomy"><Icon name="grid" size={17}/>Manage categories<Icon name="arrow" size={15}/></Link><Link href="/admin/questions"><Icon name="book" size={17}/>View all questions<Icon name="arrow" size={15}/></Link>{canManageUsers && <><Link href="/admin/users"><Icon name="shield" size={17}/>Manage users<Icon name="arrow" size={15}/></Link><Link href="/admin/system"><Icon name="settings" size={17}/>System settings<Icon name="arrow" size={15}/></Link></>}</div></section>
+    </div>
     <section className="card card-pad admin-section-gap"><div className="panel-head"><div><div className="panel-title">Architecture rules</div><div className="panel-sub">The product stays easy to change because the contracts stay explicit.</div></div><Icon name="shield" size={20}/></div><div className="rule-grid"><div><b>Reusable media</b><span>One ECG/image can be attached to unlimited questions.</span></div><div><b>Versioned questions</b><span>Edits create a new version instead of destroying history.</span></div><div><b>Server-side answers</b><span>Correct answers never travel with the student question payload.</span></div><div><b>Capability-based access</b><span>Permissions are centralized instead of scattered through UI code.</span></div></div></section>
   </div>;
 }
