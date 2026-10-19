@@ -29,6 +29,16 @@ begin
     end if;
   end loop;
 
+  if not exists (
+    select 1 from pg_policy p
+    join pg_class c on c.oid=p.polrelid
+    join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='storage' and c.relname='objects'
+      and p.polname='content editors preview private medical media'
+  ) then
+    raise exception 'missing storage RLS policy: content editors preview private medical media';
+  end if;
+
   if has_table_privilege('authenticated','public.questions','SELECT') then raise exception 'students have direct question-table SELECT'; end if;
   if has_table_privilege('authenticated','public.question_versions','SELECT') then raise exception 'students have direct question_versions SELECT'; end if;
   if has_table_privilege('authenticated','public.question_attempts','INSERT') then raise exception 'students can forge attempts directly'; end if;

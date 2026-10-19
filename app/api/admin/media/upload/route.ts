@@ -8,6 +8,8 @@ const LIMITS: Record<string, number> = {
     'image/png': 10 * 1024 * 1024,
     'image/webp': 10 * 1024 * 1024,
     'image/gif': 10 * 1024 * 1024,
+    'image/heic': 10 * 1024 * 1024,
+    'image/heif': 10 * 1024 * 1024,
     'application/pdf': 15 * 1024 * 1024,
     'video/mp4': 60 * 1024 * 1024,
     'video/webm': 60 * 1024 * 1024,
@@ -23,6 +25,10 @@ function hasValidSignature(type: string, bytes: Uint8Array) {
         return new TextDecoder().decode(bytes.slice(0, 6)) === 'GIF87a' || new TextDecoder().decode(bytes.slice(0, 6)) === 'GIF89a';
     if (type === 'image/webp')
         return new TextDecoder().decode(bytes.slice(0, 4)) === 'RIFF' && new TextDecoder().decode(bytes.slice(8, 12)) === 'WEBP';
+    if (type === 'image/heic' || type === 'image/heif') {
+        const brand = new TextDecoder().decode(bytes.slice(8, 12));
+        return new TextDecoder().decode(bytes.slice(4, 8)) === 'ftyp' && ['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'].includes(brand);
+    }
     if (type === 'application/pdf')
         return new TextDecoder().decode(bytes.slice(0, 5)) === '%PDF-';
     if (type === 'video/mp4')
@@ -36,7 +42,7 @@ function hasValidSignature(type: string, bytes: Uint8Array) {
     return false;
 }
 function extension(type: string, filename: string) {
-    const known: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'application/pdf': 'pdf', 'video/mp4': 'mp4', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/wav': 'wav' };
+    const known: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf', 'video/mp4': 'mp4', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/wav': 'wav' };
     return known[type] ?? filename.split('.').pop()?.toLowerCase() ?? 'bin';
 }
 export async function POST(request: Request) {
@@ -78,6 +84,11 @@ export async function POST(request: Request) {
         const upload = await supabase.storage.from('medical-media').upload(path, bytes, { contentType: file.type, upsert: false, cacheControl: '31536000' });
         if (upload.error)
             return NextResponse.json({ error: 'upload_failed' }, { status: 400 });
+        const { data: signed, error: signingError } = await supabase.storage.from('medical-media').createSignedUrl(path, 15 * 60);
+        if (signingError || !signed?.signedUrl) {
+            await supabase.storage.from('medical-media').remove([path]);
+            return NextResponse.json({ error: 'preview_unavailable' }, { status: 400 });
+        }
         const { data, error } = await supabase.rpc('admin_create_media', {
             p_kind: kind, p_title: title, p_alt_text: altText, p_external_url: '', p_storage_path: path,
             p_mime_type: file.type, p_source_id: null, p_license_name: licenseName, p_license_url: '',
@@ -87,7 +98,7 @@ export async function POST(request: Request) {
             await supabase.storage.from('medical-media').remove([path]);
             return NextResponse.json({ error: 'asset_record_failed' }, { status: 400 });
         }
-        return NextResponse.json({ id: data, path });
+        return NextResponse.json({ id: data, path, url: signed.signedUrl });
     }
     catch (error) {
         return apiError(error, 'upload_failed');
