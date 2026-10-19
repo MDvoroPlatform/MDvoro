@@ -66,7 +66,19 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
     const [message, setMessage] = useState('');
     function update(patch: Partial<Initial>) { setForm((value) => ({ ...value, ...patch })); }
     function updateOption(id: string, text: string) { update({ options: form.options.map((option) => option.id === id ? { ...option, text } : option) }); }
-    async function save() {
+    function addOption() {
+        if (form.options.length >= 10) return;
+        const id = String.fromCharCode(65 + form.options.length);
+        update({ options: [...form.options, { id, text: '' }] });
+    }
+    function removeOption(id: string) {
+        if (form.options.length <= 2) return;
+        const remaining = form.options.filter((option) => option.id !== id);
+        const correctIndex = remaining.findIndex((option) => option.id === form.answerKey);
+        const options = remaining.map((option, index) => ({ ...option, id: String.fromCharCode(65 + index) }));
+        update({ options, answerKey: options[Math.max(0, correctIndex)].id });
+    }
+    async function save(publishNow = false) {
         setBusy(true);
         setMessage('');
         const endpoint = form.id ? '/api/admin/questions/update' : '/api/admin/questions';
@@ -77,7 +89,7 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
             setBusy(false);
             return;
         }
-        setMessage(canPublishDirect ? 'Saved. Publishing after the linked content updates finish…' : 'Saved as draft. Nothing is published automatically.');
+        setMessage('Saved as draft.');
         let relatedUpdatesSucceeded = true;
         if (body.id || form.id) {
             const questionId = form.id || body.id;
@@ -100,7 +112,7 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
                 setMessage('Draft saved, but reconstruction labeling could not be updated.');
             }
         }
-        if (canPublishDirect && relatedUpdatesSucceeded && (body.id || form.id)) {
+        if (publishNow && canPublishDirect && relatedUpdatesSucceeded && (body.id || form.id)) {
             const publishResponse = await fetch('/api/admin/questions/publish', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -178,10 +190,11 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
         </div>
       </div>
       <div className="form-section"><div className="section-title">Knowledge classification</div><div className="taxonomy-chips">{taxonomy.length ? taxonomy.map((node) => <label className="taxonomy-chip" key={node.id}><input type="checkbox" checked={selectedTaxonomy.includes(node.id)} disabled={!canEdit} onChange={(e) => setSelectedTaxonomy((current) => e.target.checked ? [...current, node.id] : current.filter((id) => id !== node.id))}/><span>{node.name}</span><small>{node.node_type}</small></label>) : <span className="form-hint">Create subjects in Taxonomy first.</span>}</div></div><div className="form-section"><div className="section-title">Clinical question</div><label className="field"><span>Stem</span><textarea disabled={!canEdit} rows={9} value={form.stem} onChange={(e) => update({ stem: e.target.value })} placeholder="Write an original clinical question…"/></label></div>
-      <div className="form-section"><div className="section-title">Answer options</div><div className="options-editor">{form.options.map((option) => <label className="option-row" key={option.id}><b>{option.id}</b><input disabled={!canEdit} value={option.text} onChange={(e) => updateOption(option.id, e.target.value)} placeholder={`Option ${option.id}`}/><input disabled={!canEdit} className="radio" type="radio" name="answer" checked={form.answerKey === option.id} onChange={() => update({ answerKey: option.id })} aria-label={`Correct answer ${option.id}`}/></label>)}</div></div>
+      <div className="form-section"><div className="section-title">Answer options</div><div className="options-editor">{form.options.map((option) => <div className="option-row" key={option.id}><b>{option.id}</b><input disabled={!canEdit} value={option.text} onChange={(e) => updateOption(option.id, e.target.value)} placeholder={`Option ${option.id}`} aria-label={`Answer option ${option.id}`}/><label className="correct-answer"><input disabled={!canEdit} className="radio" type="radio" name="answer" checked={form.answerKey === option.id} onChange={() => update({ answerKey: option.id })} aria-label={`Mark option ${option.id} correct`}/><span>Correct</span></label>{canEdit && form.options.length > 2 && <button className="btn option-remove" type="button" onClick={() => removeOption(option.id)} aria-label={`Remove option ${option.id}`}>Remove</button>}</div>)}</div>{canEdit && form.options.length < 10 && <button className="btn option-add" type="button" onClick={addOption}>+ Add option</button>}</div>
       <div className="form-section"><div className="section-title">Medical explanation</div><label className="field"><span>Explanation</span><textarea disabled={!canEdit} rows={9} value={form.explanation} onChange={(e) => update({ explanation: e.target.value })} placeholder="Explain why the correct answer is correct and address important alternatives…"/></label><label className="field"><span>Key learning point</span><textarea disabled={!canEdit} rows={3} value={form.keyLearningPoint} onChange={(e) => update({ keyLearningPoint: e.target.value })} placeholder="One high-yield takeaway…"/></label></div>
       <div className="form-actions">
-        {canEdit && <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : canPublishDirect ? 'Save & publish' : 'Save draft'}</button>}
+        {canEdit && <button className="btn" disabled={busy} onClick={() => save(false)}>{busy ? 'Saving…' : 'Save draft'}</button>}
+        {canEdit && canPublishDirect && <button className="btn btn-primary" disabled={busy} onClick={() => save(true)}>{busy ? 'Saving…' : 'Publish question'}</button>}
         {canEdit && form.id && status === 'draft' && <button className="btn" disabled={busy} onClick={submitForReview}>Send for medical review</button>}
         {form.id && canReview && status === 'in_review' && <><button className="btn btn-primary" disabled={busy} onClick={() => review('approved')}>Approve & publish</button><button className="btn" disabled={busy} onClick={() => review('changes_requested')}>Request changes</button></>}
         {canEdit && form.id && <button className="btn" disabled={busy} onClick={duplicate}>Duplicate</button>}
@@ -190,6 +203,7 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
     </section>
     <aside className="editor-side">
       <section className="card card-pad"><div className="panel-head"><div><div className="panel-title">{form.contentCode || 'New question'}</div><div className="panel-sub">Workflow: <strong>{status.replace('_', ' ')}</strong></div></div></div></section>
+      <section className="card card-pad question-live-preview"><div className="panel-title">Live preview</div><p className="preview-stem">{form.stem.trim() || 'Your question will appear here as you write.'}</p><ol type="A">{form.options.filter((option) => option.text.trim()).map((option) => <li key={option.id}>{option.text}{option.id === form.answerKey ? <span className="preview-correct">Correct answer</span> : null}</li>)}</ol>{form.explanation.trim() && <div className="preview-explanation"><strong>Explanation</strong><p>{form.explanation}</p></div>}</section>
       <section className="card card-pad"><div className="panel-title">Reusable media</div><p className="panel-sub media-help">Search the library instead of uploading duplicates. One image or ECG can safely serve hundreds of questions.</p><MediaPicker media={media} selectedIds={form.mediaIds} canEdit={canEdit} onChange={(mediaIds) => update({ mediaIds })}/><a className="btn" href="/admin/media">Open media library</a></section>
       <section className="card card-pad"><div className="panel-title">Publishing</div><div className="security-note">{canPublishDirect ? 'Admin publishing is immediate and does not require independent medical review. Each change is versioned and audited.' : 'Answers stay behind the server boundary. Editors can submit drafts to the review queue.'}</div></section>
     </aside>

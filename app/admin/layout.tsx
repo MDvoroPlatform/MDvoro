@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { AuthorizationError, requireStaff } from '@/lib/server/authorization';
 import { AdminMobileNav, AdminNav } from '@/components/admin/admin-nav';
+import { MDvoroLogo } from '@/components/layout/mdvoro-logo';
 export const dynamic = 'force-dynamic';
 export default async function AdminLayout({ children }: {
     children: ReactNode;
@@ -24,7 +25,7 @@ export default async function AdminLayout({ children }: {
     const resolvedContext = context;
     return <div className="admin-shell">
     <aside className="admin-sidebar">
-      <Link href="/admin" className="brand"><span className="brand-mark">MD</span><span className="brand-name">MD<span>voro</span></span></Link>
+      <Link href="/admin" className="admin-brand" aria-label="MDvoro Content Studio"><MDvoroLogo/></Link>
       <div className="admin-label">Content Studio</div>
       <AdminNav role={resolvedContext.role}/>
       <div className="sidebar-spacer"/>

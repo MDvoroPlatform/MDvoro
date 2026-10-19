@@ -23,16 +23,15 @@ export default async function AdminOverview() {
     return <div className="admin-page">
     <div className="admin-page-head"><div><div className="eyebrow">Secure content operations</div><h1>Content Studio</h1><p className="subtitle">One simple workspace for authoring, media, review and publication.</p></div><Link className="btn btn-primary" href="/admin/questions/new"><Icon name="plus" size={15}/> New question</Link></div>
     <div className="grid grid-4 admin-metrics">
-      <div className="card card-pad"><div className="metric-label">Online users</div><div className="metric-value">{Number(metrics.online_users ?? 0)}</div><div className="metric-note">Seen in the last 5 minutes</div></div>
-      <div className="card card-pad"><div className="metric-label">This month revenue</div><div className="metric-value">{String(metrics.month_currency ?? '—') === 'MULTI' ? Object.entries((metrics.month_revenue_by_currency as Record<string,number>|undefined) ?? {}).map(([currency,value]) => `${currency} ${(Number(value)/100).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}`).join(' · ') : `${(Number(metrics.month_revenue_minor ?? 0)/100).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})} ${String(metrics.month_currency ?? '—')}`}</div><div className="metric-note">Current month · currencies remain separated</div></div>
-      <div className="card card-pad"><div className="metric-label">Active subscribers</div><div className="metric-value">{Number(metrics.active_subscribers ?? 0)}</div><div className="metric-note">Current entitlement</div></div>
-      <div className="card card-pad"><div className="metric-label">Active users · 24h</div><div className="metric-value">{Number(metrics.active_users_24h ?? 0)}</div><div className="metric-note">Verified learning activity</div></div>
-    </div>
-    <div className="grid grid-4 admin-metrics admin-secondary-metrics">
       <div className="card card-pad"><div className="metric-label">Total questions</div><div className="metric-value">{c.total_questions ?? 0}</div><div className="metric-note">All content records</div></div>
-      <div className="card card-pad"><div className="metric-label">Needs review</div><div className="metric-value">{c.in_review_questions ?? 0}</div><div className="metric-note">Waiting for medical approval</div></div>
       <div className="card card-pad"><div className="metric-label">Published</div><div className="metric-value">{c.published_questions ?? 0}</div><div className="metric-note">Available to learners</div></div>
-      <div className="card card-pad"><div className="metric-label">Media assets</div><div className="metric-value">{c.media_assets ?? 0}</div><div className="metric-note">Reusable clinical media</div></div>
+      <div className="card card-pad"><div className="metric-label">Drafts</div><div className="metric-value">{c.draft_questions ?? 0}</div><div className="metric-note">Saved, not published</div></div>
+      <div className="card card-pad"><div className="metric-label">Registered users</div><div className="metric-value">{Number(metrics.total_users ?? 0)}</div><div className="metric-note">All platform accounts</div></div>
+    </div>
+    <div className="grid grid-3 admin-operations-metrics">
+      <div className="card card-pad"><div className="metric-label">Needs review</div><div className="metric-value">{c.in_review_questions ?? 0}</div><div className="metric-note">Waiting in the review queue</div></div>
+      <div className="card card-pad"><div className="metric-label">Online now</div><div className="metric-value">{Number(metrics.online_users ?? 0)}</div><div className="metric-note">Seen in the last five minutes</div></div>
+      <div className="card card-pad"><div className="metric-label">Media assets</div><div className="metric-value">{c.media_assets ?? 0}</div><div className="metric-note">Reusable library records</div></div>
     </div>
     <section className="card card-pad admin-section-gap">
       <div className="panel-head"><div><div className="panel-title">Content pipeline</div><div className="panel-sub">Drafts → review queue or direct admin publish → published</div></div><Link className="muted-link" href="/admin/questions">Open questions</Link></div>
