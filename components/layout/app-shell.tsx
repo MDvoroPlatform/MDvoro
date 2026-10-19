@@ -24,7 +24,7 @@ export async function AppShell({ children, userName, role, examLabel }: {
         </HomeLogoLink>
         <PrimaryNav staff={staff}/>
         <div className="sidebar-spacer"/>
-        <div className="sidebar-footer">{m.shell.learn}<br />{m.shell.serious}<div className="sidebar-legal-links"><Link href="/legal/privacy">Privacy</Link><Link href="/legal/cookies">Cookies</Link><Link href="/legal/terms">Terms</Link></div></div>
+        <div className="sidebar-footer">{m.shell.learn}<div className="sidebar-legal-links"><Link href="/legal/privacy">Privacy</Link><Link href="/legal/cookies">Cookies</Link><Link href="/legal/terms">Terms</Link></div></div>
       </aside>
 
       <main className="main">
