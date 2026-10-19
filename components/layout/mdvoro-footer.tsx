@@ -55,7 +55,6 @@ export function MDvoroFooter() {
       <div className="mdvoro-footer-main">
         <div className="mdvoro-footer-brand">
           <Link href="/dashboard" aria-label="MDvoro home"><MDvoroLogo /></Link>
-          <p>{m.shell.serious}</p>
         </div>
         <div className="mdvoro-footer-groups">{groups.map(group => <FooterGroupView key={group.id} group={group} />)}</div>
       </div>
