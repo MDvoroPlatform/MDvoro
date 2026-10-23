@@ -120,7 +120,7 @@ test('dashboard question-progress hero fits narrow and wide screens in both text
   await page.setContent(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0">
     <main class="page"><section class="dashboard-welcome card">
       <div class="dashboard-welcome-copy"><div class="eyebrow">Personal learning workspace</div><h1>Dashboard</h1><p class="subtitle">One place for your exam, practice, memory and next best action.</p><div class="dashboard-welcome-meta"><span>Choose exam</span><span>Secure learning session</span></div></div>
-      <div class="dashboard-question-progress" role="img" aria-label="Questions answered: 1,863 of 5,497, 34 percent"><svg class="dashboard-question-progress-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="dashboard-question-progress-track" cx="50" cy="50" r="44"/><circle class="dashboard-question-progress-value" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="182.46"/></svg><div class="dashboard-question-progress-copy"><span>Questions answered</span><strong>34<small>%</small></strong><span>1,863 / 5,497 available</span></div></div>
+      <div class="dashboard-question-progress" role="img" aria-label="1,863 / 5,497 (34%)"><svg class="dashboard-question-progress-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="dashboard-question-progress-track" cx="50" cy="50" r="44"/><circle class="dashboard-question-progress-value" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="182.46"/></svg><div class="dashboard-question-progress-copy"><strong class="dashboard-question-progress-count">1,863<small> / </small>5,497</strong></div></div>
       <div class="dashboard-welcome-action"><a class="btn btn-primary" href="/qbank">Start Question Bank</a><a class="dashboard-secondary-link" href="/study-plan">View your study plan</a></div>
     </section></main></body></html>`);
   await page.addStyleTag({ path: 'app/globals.css' });
@@ -132,6 +132,7 @@ test('dashboard question-progress hero fits narrow and wide screens in both text
       const layout = await page.evaluate(() => {
         const card = document.querySelector('.dashboard-welcome')!;
         const ring = document.querySelector('.dashboard-question-progress')!;
+        const count = document.querySelector('.dashboard-question-progress-count')!;
         const action = document.querySelector('.dashboard-welcome-action')!;
         const bounds = (element: Element) => {
           const { left, right, top, bottom } = element.getBoundingClientRect();
@@ -140,12 +141,15 @@ test('dashboard question-progress hero fits narrow and wide screens in both text
         return {
           viewportWidth: document.documentElement.clientWidth,
           documentWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
-          card: bounds(card), ring: bounds(ring), action: bounds(action),
+          card: bounds(card), ring: bounds(ring), count: bounds(count), action: bounds(action),
         };
       });
       expect(layout.documentWidth, `${direction} ${width}px horizontal overflow`).toBeLessThanOrEqual(layout.viewportWidth);
       expect(layout.ring.left, `${direction} ${width}px ring escapes card`).toBeGreaterThanOrEqual(layout.card.left);
       expect(layout.ring.right, `${direction} ${width}px ring escapes card`).toBeLessThanOrEqual(layout.card.right);
+      expect(layout.count.left, `${direction} ${width}px count escapes ring`).toBeGreaterThanOrEqual(layout.ring.left);
+      expect(layout.count.right, `${direction} ${width}px count escapes ring`).toBeLessThanOrEqual(layout.ring.right);
+      await expect(page.locator('.dashboard-question-progress-count')).toHaveText('1,863 / 5,497');
       await expect(page.getByRole('link', { name: 'Start Question Bank' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'View your study plan' })).toBeVisible();
     }

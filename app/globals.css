@@ -555,9 +555,8 @@ h1 { font-size:32px; letter-spacing:-1.45px; font-weight:760; }
 .dashboard-question-progress-track { stroke:rgba(210,229,252,.28); }
 .dashboard-question-progress-value { stroke:#2cc7d6; stroke-linecap:round; transition:stroke-dashoffset .35s ease; }
 .dashboard-question-progress-copy { max-width:100%; padding:12px; display:grid; justify-items:center; gap:3px; text-align:center; }
-.dashboard-question-progress-copy span { color:#e0edff; font-size:11px; font-weight:650; line-height:1.3; }
-.dashboard-question-progress-copy strong { color:#2cc7d6; font-size:31px; line-height:1; }
-.dashboard-question-progress-copy strong small { font-size:.58em; }
+.dashboard-question-progress-count { color:#2cc7d6; font-size:clamp(11px,1vw,16px); font-variant-numeric:tabular-nums; letter-spacing:-.45px; line-height:1; white-space:nowrap; }
+.dashboard-question-progress-count small { color:#e0edff; font-size:.8em; }
 .dashboard-metrics { margin-bottom:16px; }
 .dashboard-competitive { margin:16px 0; }
 .dashboard-actions { margin-top:16px; }
@@ -611,8 +610,7 @@ html.dark .dashboard-welcome-action .btn-primary,html[data-theme="dark"] .dashbo
   .dashboard-welcome-meta span { font-size:9px; }
   .dashboard-question-progress { width:112px; }
   .dashboard-question-progress-copy { padding:8px; }
-  .dashboard-question-progress-copy span { font-size:9px; }
-  .dashboard-question-progress-copy strong { font-size:25px; }
+  .dashboard-question-progress-count { font-size:clamp(10px,3.5vw,14px); }
   .dashboard-metrics { grid-template-columns:1fr 1fr; }
   .metric { min-height:112px; padding:16px; }
   .metric-value { font-size:24px; }
@@ -783,8 +781,7 @@ html[dir="rtl"] .mobile-drawer-links a.active, html[dir="rtl"] .admin-mobile-pan
   .dashboard-welcome { grid-template-columns:minmax(0,1fr) 96px; column-gap:10px; padding-inline:16px; }
   .dashboard-question-progress { width:96px; }
   .dashboard-question-progress-copy { padding:6px; }
-  .dashboard-question-progress-copy span { font-size:8px; }
-  .dashboard-question-progress-copy strong { font-size:22px; }
+  .dashboard-question-progress-count { font-size:clamp(9px,3.25vw,12px); letter-spacing:-.6px; }
   .admin-ops-grid { grid-template-columns: minmax(0, 1fr); }
   .leaderboard-podium { gap: 5px; }
   .podium-card { padding: 8px 5px; }

@@ -18,29 +18,25 @@ export default async function DashboardPage() {
         supabase.rpc('smart_student_snapshot')
     ]);
     const snapshot = (smart ?? null) as SmartSnapshot | null;
-    const [{ data: readinessRaw }, { data: blueprintRaw, error: blueprintError }, { data: activityRaw }, { data: mistakesRaw }, { data: activeExam }] = await Promise.all([
+    const [{ data: readinessRaw }, { data: blueprintRaw }, { data: activityRaw }, { data: mistakesRaw }, { data: activeExam }, { data: questionProgressRaw, error: questionProgressError }] = await Promise.all([
       profile?.active_exam_id ? supabase.rpc('learning_readiness', { p_exam_id: profile.active_exam_id }) : Promise.resolve({ data: null }),
       profile?.active_exam_id ? supabase.rpc('learning_exam_blueprint', { p_exam_id: profile.active_exam_id }) : Promise.resolve({ data: [], error: null }),
       supabase.rpc('learning_daily_activity', { p_days: 14 }),
       profile?.active_exam_id ? supabase.rpc('learning_mistake_profile', { p_exam_id: profile.active_exam_id }) : Promise.resolve({ data: null }),
-      profile?.active_exam_id ? supabase.from('exams').select('id,code,name,official_max_items,product_max_items').eq('id', profile.active_exam_id).maybeSingle() : Promise.resolve({ data: null })
+      profile?.active_exam_id ? supabase.from('exams').select('id,code,name,official_max_items,product_max_items').eq('id', profile.active_exam_id).maybeSingle() : Promise.resolve({ data: null }),
+      supabase.rpc('learning_question_progress', { p_exam_id: profile?.active_exam_id ?? null })
     ]);
     const readiness = (readinessRaw ?? null) as { readiness_score?:number; accuracy?:number; coverage?:number; attempts_7d?:number; due_cards?:number; confidence_gap?:number|null; peer_percentile?:number|null; peer_participants?:number } | null;
     const hasExam = Boolean(profile?.active_exam_id);
-    const questionProgress = hasExam && !blueprintError && Array.isArray(blueprintRaw)
-      ? calculateQuestionProgress(blueprintRaw as BlueprintRow[])
+    const questionProgressRow = Array.isArray(questionProgressRaw) ? questionProgressRaw[0] : null;
+    const questionProgress = !questionProgressError && questionProgressRow
+      ? calculateQuestionProgress([{ available: questionProgressRow.total, attempted: questionProgressRow.solved }])
       : null;
     const competitiveCopy = ({
-      en: { readiness: 'Readiness index', readinessNote: 'Transparent learning-health signal, not an official exam score.', weekly: 'Weekly challenge', weeklyNote: 'Questions this week toward a focused minimum.', confidence: 'Confidence calibration', confidenceNote: 'High-confidence accuracy minus low-confidence accuracy.', peers: 'Peer standing', peersNote: 'Shown only when the privacy threshold is met.', notebook: 'My Notebook', notebookNote: 'Keep every private QBank note searchable in one place.', answered: 'Questions answered', countUnavailable: 'Question totals unavailable', noQuestions: 'No questions available for this exam yet.' },
-      he: { readiness: 'מדד מוכנות', readinessNote: 'מדד שקוף לבריאות הלמידה — לא ציון רשמי בבחינה.', weekly: 'אתגר שבועי', weeklyNote: 'שאלות השבוע בדרך ליעד ממוקד.', confidence: 'כיול ביטחון', confidenceNote: 'דיוק בתשובות עם ביטחון גבוה פחות דיוק בביטחון נמוך.', peers: 'מיקום מול עמיתים', peersNote: 'מוצג רק כאשר סף הפרטיות מתקיים.', notebook: 'המחברת שלי', notebookNote: 'כל ההערות הפרטיות שלך במקום אחד, עם חיפוש.', answered: 'שאלות שנענו', countUnavailable: 'ספירת השאלות אינה זמינה', noQuestions: 'אין עדיין שאלות זמינות לבחינה הזו.' },
-      ar: { readiness: 'مؤشر الجاهزية', readinessNote: 'مؤشر شفاف لصحة التعلم، وليس نتيجة رسمية للامتحان.', weekly: 'التحدي الأسبوعي', weeklyNote: 'أسئلة هذا الأسبوع نحو هدف مركز.', confidence: 'معايرة الثقة', confidenceNote: 'دقة الإجابات ذات الثقة العالية ناقص دقة الثقة المنخفضة.', peers: 'مقارنة الزملاء', peersNote: 'يظهر فقط عند استيفاء حد الخصوصية.', notebook: 'مذكرتي', notebookNote: 'احتفظ بكل ملاحظاتك الخاصة مع بحث سريع.', answered: 'الأسئلة المجاب عنها', countUnavailable: 'إحصاءات الأسئلة غير متاحة الآن', noQuestions: 'لا توجد أسئلة متاحة لهذا الامتحان حاليًا.' },
-      ru: { readiness: 'Индекс готовности', readinessNote: 'Прозрачный показатель обучения, а не официальный балл экзамена.', weekly: 'Недельный вызов', weeklyNote: 'Вопросы этой недели к целевому минимуму.', confidence: 'Калибровка уверенности', confidenceNote: 'Точность при высокой уверенности минус точность при низкой.', peers: 'Сравнение с коллегами', peersNote: 'Показывается только при соблюдении порога приватности.', notebook: 'Мой блокнот', notebookNote: 'Все личные заметки QBank доступны в одном поиске.', answered: 'Отвеченные вопросы', countUnavailable: 'Количество вопросов сейчас недоступно', noQuestions: 'Для этого экзамена пока нет доступных вопросов.' },
-    } as const)[locale];
-    const questionCountCopy = ({
-      en: { total: 'available', chooseExam: 'Choose an exam to see your question progress' },
-      he: { total: 'זמינות', chooseExam: 'בחרו בחינה כדי לראות את התקדמות השאלות' },
-      ar: { total: 'متاحة', chooseExam: 'اختر امتحانًا لعرض تقدّمك في الأسئلة' },
-      ru: { total: 'доступно', chooseExam: 'Выберите экзамен, чтобы увидеть прогресс по вопросам' },
+      en: { readiness: 'Readiness index', readinessNote: 'Transparent learning-health signal, not an official exam score.', weekly: 'Weekly challenge', weeklyNote: 'Questions this week toward a focused minimum.', confidence: 'Confidence calibration', confidenceNote: 'High-confidence accuracy minus low-confidence accuracy.', peers: 'Peer standing', peersNote: 'Shown only when the privacy threshold is met.', notebook: 'My Notebook', notebookNote: 'Keep every private QBank note searchable in one place.' },
+      he: { readiness: 'מדד מוכנות', readinessNote: 'מדד שקוף לבריאות הלמידה — לא ציון רשמי בבחינה.', weekly: 'אתגר שבועי', weeklyNote: 'שאלות השבוע בדרך ליעד ממוקד.', confidence: 'כיול ביטחון', confidenceNote: 'דיוק בתשובות עם ביטחון גבוה פחות דיוק בביטחון נמוך.', peers: 'מיקום מול עמיתים', peersNote: 'מוצג רק כאשר סף הפרטיות מתקיים.', notebook: 'המחברת שלי', notebookNote: 'כל ההערות הפרטיות שלך במקום אחד, עם חיפוש.' },
+      ar: { readiness: 'مؤشر الجاهزية', readinessNote: 'مؤشر شفاف لصحة التعلم، وليس نتيجة رسمية للامتحان.', weekly: 'التحدي الأسبوعي', weeklyNote: 'أسئلة هذا الأسبوع نحو هدف مركز.', confidence: 'معايرة الثقة', confidenceNote: 'دقة الإجابات ذات الثقة العالية ناقص دقة الثقة المنخفضة.', peers: 'مقارنة الزملاء', peersNote: 'يظهر فقط عند استيفاء حد الخصوصية.', notebook: 'مذكرتي', notebookNote: 'احتفظ بكل ملاحظاتك الخاصة مع بحث سريع.' },
+      ru: { readiness: 'Индекс готовности', readinessNote: 'Прозрачный показатель обучения, а не официальный балл экзамена.', weekly: 'Недельный вызов', weeklyNote: 'Вопросы этой недели к целевому минимуму.', confidence: 'Калибровка уверенности', confidenceNote: 'Точность при высокой уверенности минус точность при низкой.', peers: 'Сравнение с коллегами', peersNote: 'Показывается только при соблюдении порога приватности.', notebook: 'Мой блокнот', notebookNote: 'Все личные заметки QBank доступны в одном поиске.' },
     } as const)[locale];
     const ringCircumference = 2 * Math.PI * 44;
     const ringProgress = questionProgress ? questionProgress.percentage : 0;
@@ -53,19 +49,18 @@ export default async function DashboardPage() {
       <div className="dashboard-welcome-meta"><span><Icon name="book" size={13}/>{hasExam ? (activeExam?.code ?? m.settings.activeExam) : m.shell.chooseExam}</span><span><Icon name="shield" size={13}/>{m.shell.secure}</span></div>
     </div>
     <div className="dashboard-question-progress" role="img" aria-label={questionProgress
-      ? `${competitiveCopy.answered}: ${questionProgress.answered} of ${questionProgress.total}, ${ringProgress} percent`
-      : hasExam ? competitiveCopy.countUnavailable : questionCountCopy.chooseExam}>
+      ? `${questionProgress.answered} / ${questionProgress.total} (${ringProgress}%)`
+      : '— / —'}>
       <svg className="dashboard-question-progress-ring" viewBox="0 0 100 100" aria-hidden="true">
         <circle className="dashboard-question-progress-track" cx="50" cy="50" r="44" />
         <circle className="dashboard-question-progress-value" cx="50" cy="50" r="44" strokeDasharray={ringCircumference} strokeDashoffset={ringCircumference * (1 - ringProgress / 100)} />
       </svg>
       <div className="dashboard-question-progress-copy">
-        <span>{competitiveCopy.answered}</span>
-        {questionProgress ? <>
-          <strong>{questionProgress.percentage}<small>%</small></strong>
-          <span>{questionProgress.answered.toLocaleString(locale)} / {questionProgress.total.toLocaleString(locale)} {questionCountCopy.total}</span>
-        </> : <span>{hasExam ? competitiveCopy.countUnavailable : questionCountCopy.chooseExam}</span>}
-        {questionProgress?.total === 0 && <span>{competitiveCopy.noQuestions}</span>}
+        <strong className="dashboard-question-progress-count">
+          {questionProgress ? questionProgress.answered.toLocaleString(locale) : '—'}
+          <small aria-hidden="true"> / </small>
+          {questionProgress ? questionProgress.total.toLocaleString(locale) : '—'}
+        </strong>
       </div>
     </div>
     <div className="dashboard-welcome-action"><Link className="btn btn-primary" href="/qbank"><Icon name="plus" size={15}/>{m.common.start} {m.dashboard.qbank}</Link><Link className="dashboard-secondary-link" href="/study-plan">{m.dashboard.plan}</Link></div>

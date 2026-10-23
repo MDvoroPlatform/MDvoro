@@ -17,6 +17,14 @@ describe('calculateQuestionProgress', () => {
     });
   });
 
+  it('shows zero answered out of the real available total for a new learner', () => {
+    expect(calculateQuestionProgress([{ available: 5497, attempted: 0 }])).toEqual({
+      total: 5497,
+      answered: 0,
+      percentage: 0,
+    });
+  });
+
   it('handles string counts and an empty pool without dividing by zero', () => {
     expect(calculateQuestionProgress([{ available: '0', attempted: '3' }])).toEqual({
       total: 0,
