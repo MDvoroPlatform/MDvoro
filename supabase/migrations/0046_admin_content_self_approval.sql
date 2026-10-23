@@ -1,4 +1,4 @@
--- Admins with the required MFA assurance may approve their own content.
+-- Active admins with the required MFA assurance may approve their own questions.
 -- Keep reviewer permissions, account status, MFA, and immutable audit records enforced.
 
 create or replace function public.review_question(
@@ -69,52 +69,3 @@ end;
 $$;
 revoke all on function public.review_question(uuid,text,text) from public;
 grant execute on function public.review_question(uuid,text,text) to authenticated;
-
-create or replace function public.review_ai_suggestion(
-  p_suggestion_id uuid,
-  p_status text,
-  p_note text default null
-)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_requester uuid;
-  v_admin_self_review boolean;
-begin
-  if not public.has_permission('content.review') then raise exception 'forbidden'; end if;
-  if p_status is null or p_status not in ('accepted','edited','rejected') then raise exception 'invalid_status'; end if;
-
-  select j.requested_by
-    into v_requester
-    from public.ai_content_suggestions s
-    join public.content_generation_jobs j on j.id=s.job_id
-    where s.id=p_suggestion_id;
-  if v_requester is null then raise exception 'suggestion_not_found'; end if;
-
-  select exists (
-    select 1 from public.profiles p
-    where p.id=auth.uid()
-      and p.account_status='active'
-      and p.role in ('admin'::public.user_role,'super_admin'::public.user_role)
-  ) into v_admin_self_review;
-  if v_requester=auth.uid() and not v_admin_self_review then
-    raise exception 'self_review_forbidden';
-  end if;
-
-  update public.ai_content_suggestions
-    set reviewer_status=p_status,reviewer_id=auth.uid(),
-        reviewer_note=p_note,reviewed_at=now()
-    where id=p_suggestion_id;
-
-  insert into public.content_audit_logs(actor_id,entity_type,entity_id,action,metadata)
-    values(auth.uid(),'ai_suggestion',p_suggestion_id,p_status,jsonb_build_object(
-      'note',p_note,
-      'admin_self_review',v_requester=auth.uid() and v_admin_self_review
-    ));
-end;
-$$;
-revoke all on function public.review_ai_suggestion(uuid,text,text) from public;
-grant execute on function public.review_ai_suggestion(uuid,text,text) to authenticated;
