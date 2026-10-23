@@ -48,10 +48,9 @@ export function QBankConfigurator({ exams, currentExamId, initialPool, initialEx
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [openPanel, setOpenPanel] = useState<string | null>(null);
+  const [openPanel, setOpenPanel] = useState<string | null>('disciplines');
   const [expandedSources, setExpandedSources] = useState<string[]>([]);
   const [expandedDisciplines, setExpandedDisciplines] = useState<string[]>([]);
-  const [topicSearch, setTopicSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -105,6 +104,7 @@ export function QBankConfigurator({ exams, currentExamId, initialPool, initialEx
     ]).then(([nextTree, nextCatalog]) => {
       setTree(nextTree);
       setCatalog(nextCatalog);
+      setExpandedDisciplines(nextTree.disciplines.map(discipline => discipline.value));
       setFilters(current => current.questionCount > nextTree.available && nextTree.available > 0 ? { ...current, questionCount: nextTree.available } : current);
     }).catch(error => {
       if (error?.name !== 'AbortError') setLoadError(true);
@@ -145,21 +145,13 @@ export function QBankConfigurator({ exams, currentExamId, initialPool, initialEx
     update({ allDisciplines: next.all, fullSubjects: next.subjects, topicIds: next.topicIds });
   };
   const toggleTopic = (discipline: Discipline, topic: Topic) => {
-    if (topic.isOthers || topic.count === 0) return;
+    if (topic.count === 0) return;
     const next = toggleTopicSelection({ all: filters.allDisciplines, subjects: filters.fullSubjects, topicIds: filters.topicIds }, discipline.value, topic.id, tree?.disciplines ?? []);
     update({ allDisciplines: next.all, fullSubjects: next.subjects, topicIds: next.topicIds });
   };
   const disciplineChecked = (discipline: Discipline) => getDisciplineSelectionState({ all: filters.allDisciplines, subjects: filters.fullSubjects, topicIds: filters.topicIds }, discipline).checked;
   const disciplinePartial = (discipline: Discipline) => getDisciplineSelectionState({ all: filters.allDisciplines, subjects: filters.fullSubjects, topicIds: filters.topicIds }, discipline).partial;
   const topicChecked = (discipline: Discipline, topic: Topic) => filters.allDisciplines || filters.fullSubjects.includes(discipline.value) || filters.topicIds.includes(topic.id);
-  const filteredDisciplines = useMemo(() => {
-    const query = topicSearch.trim().toLocaleLowerCase();
-    if (!query) return tree?.disciplines ?? [];
-    return (tree?.disciplines ?? []).map(d => ({ ...d, topics: d.topics.filter(topic => topic.name.toLocaleLowerCase().includes(query)) })).filter(d => d.label.toLocaleLowerCase().includes(query) || d.topics.length > 0);
-  }, [tree, topicSearch]);
-  useEffect(() => {
-    if (topicSearch.trim()) setExpandedDisciplines(current => [...new Set([...current, ...filteredDisciplines.map(d => d.value)])]);
-  }, [topicSearch, filteredDisciplines]);
   const statusLabel = { all: t.allStatus, unanswered: t.unanswered, incorrect: t.incorrect, saved: t.saved, notes: t.notes }[filters.status];
   const sourceSummary = filters.allSources ? t.allSources : `${filters.sourceIds.length} ${t.selected}`;
   const disciplineSummary = filters.allDisciplines ? t.allDisciplines : `${filters.fullSubjects.length + filters.topicIds.length} ${t.selected}`;
@@ -189,7 +181,6 @@ export function QBankConfigurator({ exams, currentExamId, initialPool, initialEx
 
   function reset() {
     setFilters(emptyFilters());
-    setTopicSearch('');
     setExpandedSources([]);
     setExpandedDisciplines([]);
     setMessage('');
@@ -205,7 +196,7 @@ export function QBankConfigurator({ exams, currentExamId, initialPool, initialEx
   </section>;
 
   return <div className="qbank-session-builder">
-    {section('exam', t.exam, exams.find(exam => exam.id === examId)?.name ?? t.chooseExam, <label className="qbank-builder-field"><span>{t.chooseExam}</span><select value={examId} onChange={event => { setExamId(event.target.value); setOpenPanel(null); }}>
+    {section('exam', t.exam, exams.find(exam => exam.id === examId)?.name ?? t.chooseExam, <label className="qbank-builder-field"><span>{t.chooseExam}</span><select value={examId} onChange={event => { setExamId(event.target.value); setOpenPanel('disciplines'); }}>
       {exams.map(exam => <option key={exam.id} value={exam.id}>{exam.code} — {exam.name}</option>)}
     </select></label>)}
     {section('basic', t.basic, `${filters.mode === 'practice' ? t.practice : t.examMode} · ${t.questionCount}: ${effectiveCount}`, <div className="qbank-basic-panel">
@@ -229,16 +220,15 @@ export function QBankConfigurator({ exams, currentExamId, initialPool, initialEx
     </div>)}
     {section('disciplines', t.disciplines, disciplineSummary, <div className="qbank-tree-list">
       <div className="qbank-tree-actions"><label className="qbank-choice qbank-select-all"><input type="checkbox" checked={filters.allDisciplines} onChange={event => update({ allDisciplines: event.target.checked, fullSubjects: [], topicIds: [] })} /><span>{t.allDisciplines}</span></label><button type="button" onClick={() => update({ allDisciplines: false, fullSubjects: [], topicIds: [] })}>{t.none}</button></div>
-      <label className="qbank-topic-search"><span className="sr-only">{t.search}</span><input type="search" value={topicSearch} onChange={event => setTopicSearch(event.target.value)} placeholder={t.search} /></label>
       {loading && <div className="qbank-filter-state" role="status">{t.loading}</div>}
-      {!loading && !filteredDisciplines.length && <div className="qbank-filter-state">{t.noDisciplines}</div>}
-      {filteredDisciplines.map(discipline => <div className="qbank-source-group" key={discipline.value}>
+      {!loading && !tree?.disciplines.length && <div className="qbank-filter-state">{t.noDisciplines}</div>}
+      {(tree?.disciplines ?? []).map(discipline => <div className="qbank-source-group" key={discipline.value}>
         <div className="qbank-tree-row">
           <label className="qbank-choice"><input type="checkbox" checked={disciplineChecked(discipline)} aria-checked={disciplinePartial(discipline) ? 'mixed' : disciplineChecked(discipline)} onChange={() => toggleDiscipline(discipline)} /><span>{discipline.label}</span><small>{discipline.count}</small></label>
           {discipline.topics.length > 0 && <button className="qbank-expand-button" type="button" aria-expanded={expandedDisciplines.includes(discipline.value)} aria-label={`${expandedDisciplines.includes(discipline.value) ? t.collapse : t.expand} ${discipline.label}`} onClick={() => setExpandedDisciplines(current => current.includes(discipline.value) ? current.filter(value => value !== discipline.value) : [...current, discipline.value])}>{expandedDisciplines.includes(discipline.value) ? '−' : '+'}</button>}
         </div>
-        {expandedDisciplines.includes(discipline.value) && discipline.topics.length > 0 && <div className="qbank-tree-children">{discipline.topics.filter(topic => !topicSearch || topic.name.toLocaleLowerCase().includes(topicSearch.toLocaleLowerCase()) || discipline.label.toLocaleLowerCase().includes(topicSearch.toLocaleLowerCase())).map(topic => <label className={`qbank-choice ${topic.count === 0 ? 'is-empty' : ''}`} key={topic.id} title={topic.isOthers ? t.allDisciplines : undefined}>
-          <input type="checkbox" checked={topicChecked(discipline, topic)} disabled={topic.isOthers || topic.count === 0} onChange={() => toggleTopic(discipline, topic)} />
+        {expandedDisciplines.includes(discipline.value) && discipline.topics.length > 0 && <div className="qbank-tree-children">{discipline.topics.map(topic => <label className={`qbank-choice ${topic.count === 0 ? 'is-empty' : ''}`} key={topic.id}>
+          <input type="checkbox" checked={topicChecked(discipline, topic)} disabled={topic.count === 0} onChange={() => toggleTopic(discipline, topic)} />
           <span>{topic.name}</span><small>{topic.count}</small>
         </label>)}</div>}
       </div>)}

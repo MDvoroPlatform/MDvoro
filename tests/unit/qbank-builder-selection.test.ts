@@ -19,6 +19,11 @@ describe('QBank builder discipline and topic selection', () => {
     expect(getDisciplineSelectionState(selection, disciplines[0])).toEqual({ checked: false, partial: true, includesOthers: false });
   });
 
+  it('allows selecting the Others bucket as a topic option', () => {
+    const selection = toggleTopicSelection({ all: false, subjects: [], topicIds: [] }, 'Medicine', 'others', disciplines);
+    expect(selection).toEqual({ all: false, subjects: [], topicIds: ['others'] });
+  });
+
   it('includes Others only for an all-discipline or whole-discipline selection', () => {
     expect(getDisciplineSelectionState({ all: true, subjects: [], topicIds: [] }, disciplines[0]).includesOthers).toBe(true);
     expect(getDisciplineSelectionState({ all: false, subjects: ['Medicine'], topicIds: [] }, disciplines[0]).includesOthers).toBe(true);

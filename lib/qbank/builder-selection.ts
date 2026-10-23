@@ -17,7 +17,7 @@ export function toggleDisciplineSelection(
   if (current.all) {
     return { all: false, subjects: disciplines.map(d => d.value).filter(item => item !== value), topicIds: [] };
   }
-  const topicIds = new Set(disciplines.find(d => d.value === value)?.topics.filter(t => !t.isOthers).map(t => t.id) ?? []);
+  const topicIds = new Set(disciplines.find(d => d.value === value)?.topics.map(t => t.id) ?? []);
   if (current.subjects.includes(value)) {
     return { all: false, subjects: current.subjects.filter(item => item !== value), topicIds: current.topicIds.filter(id => !topicIds.has(id)) };
   }
@@ -30,7 +30,7 @@ export function toggleTopicSelection(
   topicId: string,
   disciplines: SelectionDiscipline[],
 ): CategorySelection {
-  const topicIds = new Set(disciplines.find(d => d.value === value)?.topics.filter(t => !t.isOthers).map(t => t.id) ?? []);
+  const topicIds = new Set(disciplines.find(d => d.value === value)?.topics.map(t => t.id) ?? []);
   let subjects = [...current.subjects];
   let selectedTopics = [...current.topicIds];
   if (current.all) {

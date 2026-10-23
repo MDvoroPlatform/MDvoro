@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const migration = readFileSync(new URL('../../supabase/migrations/0055_qbank_session_builder.sql', import.meta.url), 'utf8');
+const topicsAsOptionsMigration = readFileSync(new URL('../../supabase/migrations/0056_qbank_topics_as_options.sql', import.meta.url), 'utf8');
 
 describe('QBank builder migration contract', () => {
   it('is additive and safe to rerun', () => {
@@ -30,5 +31,10 @@ describe('QBank builder migration contract', () => {
     expect(migration).toMatch(/select distinct exam_id,reconstruction_year from public\.questions/i);
     expect(migration).toMatch(/create trigger exams_qbank_default_sources after insert on public\.exams/i);
     expect(migration).toMatch(/public\.qbank_builder_filter_tree/i);
+  });
+
+  it('makes Others selectable and recognizes the existing OB/GYN subject spelling', () => {
+    expect(topicsAsOptionsMigration).toMatch(/t.name='Others' and not exists/i);
+    expect(topicsAsOptionsMigration).toMatch(/obstetrics and gynecology/i);
   });
 });
