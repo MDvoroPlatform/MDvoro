@@ -1375,3 +1375,8 @@ html.dark .mobile-drawer-links a.active .mobile-drawer-icon, html[data-theme="da
 /* Keep fixed navigation surfaces opaque so page content cannot show through. */
 .topbar,.mobile-nav{background:var(--surface)!important;backdrop-filter:none!important}
 html.dark .topbar,html[data-theme="dark"] .topbar,html.dark .mobile-nav,html[data-theme="dark"] .mobile-nav{background:var(--surface)!important}
+@media(max-width:768px){
+  .topbar-mobile-controls{flex:0 1 auto!important;width:auto!important;justify-content:flex-start!important;gap:8px!important}
+  .topbar-tools{display:flex!important;flex:0 0 auto;margin-inline-start:auto!important}
+  .topbar-tools .notification-bell{width:36px;height:36px}
+}
