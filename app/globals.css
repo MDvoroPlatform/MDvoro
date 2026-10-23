@@ -318,7 +318,6 @@ h1 { margin:5px 0 0;font-size:30px;letter-spacing:-1px;line-height:1.15; }
 /* Phase 17 — premium responsive shell, dark mode and localization-safe layout */
 html.dark { color-scheme: dark; }
 html.dark, html[data-theme="dark"] { --card: var(--surface); --bg:#07111f; --surface:#0d1a2b; --surface-muted:#101f33; --ink:#e9f1fb; --muted:#9db0c7; --line:#20334b; --brand:#5ea8ff; --brand-dark:#8fc8ff; --brand-soft:#123052; --sidebar:#030b16; --sidebar-muted:#8fa5bd; --surface-2:#0f2034; --border:var(--line); --text-muted:var(--muted); --shadow-sm:0 1px 2px rgba(0,0,0,.25),0 8px 24px rgba(0,0,0,.18); --shadow-md:0 20px 42px rgba(0,0,0,.28); }
-@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) { color-scheme:dark; --bg:#07111f; --surface:#0d1a2b; --surface-muted:#101f33; --ink:#e9f1fb; --muted:#9db0c7; --line:#20334b; --brand:#5ea8ff; --brand-dark:#8fc8ff; --brand-soft:#123052; --sidebar:#030b16; --sidebar-muted:#8fa5bd; --surface-2:#0f2034; --border:var(--line); --text-muted:var(--muted); } }
 html.dark body, html[data-theme="dark"] body { background:var(--bg); color:var(--ink); }
 html.dark .topbar, html[data-theme="dark"] .topbar, html.dark .mobile-nav, html[data-theme="dark"] .mobile-nav { background:rgba(7,17,31,.92); }
 html.dark .btn, html[data-theme="dark"] .btn, html.dark .field input, html[data-theme="dark"] .field input, html.dark .form input, html[data-theme="dark"] .form input, html.dark .form select, html[data-theme="dark"] .form select, html.dark .field select, html[data-theme="dark"] .field select, html.dark .field textarea, html[data-theme="dark"] .field textarea { background:#0d1a2b; color:var(--ink); border-color:var(--line); }
@@ -628,17 +627,6 @@ html.dark .dashboard-welcome-action .btn-primary,html[data-theme="dark"] .dashbo
 .topbar-search .search > svg { position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#7f8ca0; z-index:1; pointer-events:none; }
 html[dir="rtl"] .topbar-search .search > svg { left:auto; right:15px; }
 html[dir="rtl"] .topbar-search .search input { padding-left:72px; padding-right:41px; }
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) {
-    --bg:#060e19; --surface:#0d1726; --surface-muted:#111f32; --surface-2:#0e1b2d;
-    --ink:#f0f5fc; --muted:#98aac0; --line:#1e3047; --brand:#62aaff; --brand-dark:#8fc8ff;
-    --brand-soft:#112f51; --sidebar:#07111f; --sidebar-muted:#8fa3bc;
-    --shadow-sm:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.22); --shadow-md:0 22px 55px rgba(0,0,0,.35);
-  }
-  html:not([data-theme="light"]) .mdvoro-logo-light { display:none !important; }
-  html:not([data-theme="light"]) .mdvoro-logo-dark { display:block !important; }
-}
-
 /* Responsive release pass: fluid content, complete touch navigation and safe-area spacing. */
 html { min-width: 320px; }
 body { min-width: 320px; overflow-x: clip; }
