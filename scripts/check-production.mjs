@@ -57,7 +57,12 @@ for (const file of sourceFiles) {
   const text = read(file);
   if (/\bas any\b|:\s*any\b|<any>/.test(text)) failures.push(`${file}: explicit any`);
   if (/dangerouslySetInnerHTML|\binnerHTML\b|\beval\(/.test(text)) failures.push(`${file}: dangerous dynamic HTML/eval`);
-  if (/SUPABASE_SERVICE_ROLE_KEY|service_role/i.test(text)) failures.push(`${file}: service-role secret referenced in application code`);
+  // The service-role key is required by the admin-only Auth API wrapper. Keep
+  // that use isolated to the server endpoint module; the client architecture
+  // gate separately prevents the name or key from entering browser code.
+  if (/SUPABASE_SERVICE_ROLE_KEY|service_role/i.test(text) && file.replaceAll(path.sep, '/') !== 'lib/supabase/admin.ts') {
+    failures.push(`${file}: service-role secret referenced outside the isolated admin server module`);
+  }
 }
 
 if (failures.length) {

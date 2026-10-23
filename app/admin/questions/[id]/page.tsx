@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requireStaff } from '@/lib/server/authorization';
 import { QuestionForm } from '@/components/admin/question-form';
+import { QuestionDeleteButton } from '@/components/admin/question-delete-button';
 export default async function EditQuestionPage({ params }: {
     params: Promise<{
         id: string;
@@ -22,7 +23,7 @@ export default async function EditQuestionPage({ params }: {
     if (!q)
         notFound();
     const isAdmin = context.role === 'admin' || context.role === 'super_admin';
-    return <div className="admin-page"><div className="admin-page-head"><div><div className="eyebrow">Question editor</div><h1>{q.content_code}</h1><p className="subtitle">{isAdmin ? 'Save edits as a draft, or publish them directly without independent medical review. Every save creates a version.' : 'Save a draft, submit it to the review queue, then publish. Every save creates a version.'}</p></div></div><QuestionForm taxonomy={taxonomy ?? []} selectedTaxonomyIds={(selectedTaxonomy ?? []).map((x) => x.taxonomy_id)} exams={exams ?? []} media={media ?? []} canReview={isAdmin || context.role === 'reviewer'} canEdit={isAdmin || context.role === 'editor'} canPublishDirect={isAdmin} initial={{ id: q.id, contentCode: q.content_code, examId: q.exam_id, stem: q.stem, subject: q.subject, topic: q.topic ?? '', options: (q.options as {
+    return <div className="admin-page"><div className="admin-page-head"><div><div className="eyebrow">Question editor</div><h1>{q.content_code}</h1><p className="subtitle">{isAdmin ? 'Save edits as a draft, or publish them directly without independent medical review. Every save creates a version.' : 'Save a draft, submit it to the review queue, then publish. Every save creates a version.'}</p></div>{isAdmin && <QuestionDeleteButton questionId={q.id}/>}</div><QuestionForm taxonomy={taxonomy ?? []} selectedTaxonomyIds={(selectedTaxonomy ?? []).map((x) => x.taxonomy_id)} exams={exams ?? []} media={media ?? []} canReview={isAdmin || context.role === 'reviewer'} canEdit={isAdmin || context.role === 'editor'} canPublishDirect={isAdmin} initial={{ id: q.id, contentCode: q.content_code, examId: q.exam_id, stem: q.stem, subject: q.subject, topic: q.topic ?? '', options: (q.options as {
             id: string;
             text: string;
         }[]) ?? [], answerKey: q.answer_key, explanation: q.explanation ?? '', keyLearningPoint: q.key_learning_point ?? '', difficulty: q.difficulty, mediaIds: q.media_ids ?? [], workflowStatus: q.workflow_status, isReconstruction: q.is_reconstruction ?? false, reconstructionYear: q.reconstruction_year ?? null, reconstructionLabel: q.reconstruction_label ?? 'שחזור', sourceReference: rights?.[0]?.source_reference ?? '', rightsBasis: rights?.[0]?.rights_basis ?? 'unknown' }}/></div>;

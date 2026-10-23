@@ -33,7 +33,7 @@ type Question = {
   explanation: string | null;
   key_learning_point: string | null;
   note: string | null;
-  media: { id: string; kind: string; alt_text: string; external_url: string | null; caption: string | null; position: number }[];
+  media: { id: string; kind: string; alt_text: string; external_url: string | null; url?: string | null; caption: string | null; position: number }[];
 };
 
 type SessionState = {
@@ -217,9 +217,9 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     setSaving(false);
   }, [confidence, currentPosition, load, m.qbank.blockClosed, m.qbank.blockNotOpen, m.qbank.couldNotRecord, m.qbank.sessionExpired, questionStartedAt, saving, selected, sessionId, state]);
 
-  async function createFlashcardFromMistake() {
+  async function createFlashcardFromQuestion() {
     const question = state?.question;
-    if (!question || !question.answered || question.is_correct !== false || flashcardStatus === 'saving') return;
+    if (!question || flashcardStatus === 'saving') return;
     setFlashcardStatus('saving');
     setError(null);
     try {
@@ -387,7 +387,10 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         <div className="card card-pad question-card">
           <div className="question-meta"><span>{question.subject}</span>{question.topic && <span>{question.topic}</span>}{question.reconstruction?.is_reconstruction && <span className="reconstruction-badge">{question.reconstruction.label} {question.reconstruction.year ?? ''}</span>}<span>{m.qbank.difficulty} {question.difficulty ?? '—'}/5</span></div>
           <div className="question-stem">{question.stem}</div>
-          {media.length > 0 && <div className="question-media">{media.map((asset) => asset.external_url ? <figure key={asset.id}><Image src={asset.external_url} alt={asset.alt_text} width={1200} height={800} unoptimized loading="lazy" decoding="async" referrerPolicy="no-referrer"/><figcaption>{asset.caption}</figcaption></figure> : null)}</div>}
+          {media.length > 0 && <div className="question-media">{media.map((asset) => {
+            const src = asset.url || asset.external_url;
+            return src ? <figure key={asset.id}><Image src={src} alt={asset.alt_text} width={1200} height={800} unoptimized loading="lazy" decoding="async" referrerPolicy="no-referrer"/><figcaption>{asset.caption}</figcaption></figure> : null;
+          })}</div>}
           <div className="answer-options">
             {question.options.map((option) => {
               const answered = question.answered;
@@ -410,22 +413,18 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
               <strong>{question.is_correct ? m.qbank.correct : m.qbank.incorrect}</strong>
               {question.explanation && <p>{question.explanation}</p>}
               {question.key_learning_point && <div className="learning-point"><b>{m.qbank.keyLearning}</b><span>{question.key_learning_point}</span></div>}
-              {question.is_correct === false && <div className="mistake-action">
-                <button className="btn btn-primary" type="button" disabled={flashcardStatus === 'saving' || flashcardStatus === 'saved'} onClick={() => void createFlashcardFromMistake()}>
-                  {flashcardStatus === 'saving' ? m.common.loading : flashcardStatus === 'saved' ? m.common.saved : m.qbank.createFromMistake}
-                </button>
-                {flashcardStatus === 'error' && <span className="panel-sub">{m.qbank.couldNotCreate}</span>}
-              </div>}
             </div>
           )}
 
           <div className="question-actions qbank-session-tools">
             <textarea aria-label={m.qbank.note} value={note} onChange={(event) => setNote(event.target.value)} placeholder={m.qbank.notePlaceholder} />
             <div className="qbank-tool-row">
+              <button className={`btn${flashcardStatus === 'saved' ? ' btn-primary' : ''}`} disabled={flashcardStatus === 'saving' || flashcardStatus === 'saved'} onClick={() => void createFlashcardFromQuestion()} type="button">{flashcardStatus === 'saving' ? m.common.loading : flashcardStatus === 'saved' ? m.common.saved : m.qbank.addToFlashcards}</button>
               <button className={`btn${currentItem?.marked ? ' btn-primary' : ''}`} disabled={saving} onClick={() => toggleMark()} type="button">{currentItem?.marked ? m.qbank.unmark : m.qbank.markForReview}</button>
               <button className="btn" disabled={saving} onClick={() => saveNote()} type="button">{m.common.save}</button>
               <button className="btn" disabled={!canSeeKeyTerms || question.key_terms.length === 0} onClick={() => setKeyVisible((visible) => !visible)} type="button">{m.qbank.keyTerms}</button>
             </div>
+            {flashcardStatus === 'error' && <span className="panel-sub">{m.qbank.couldNotCreate}</span>}
             {keyVisible && canSeeKeyTerms && question.key_terms.length > 0 && <div className="key-terms">{question.key_terms.slice(0, 3).map((term) => <span key={term}>{term}</span>)}</div>}
           </div>
         </div>
