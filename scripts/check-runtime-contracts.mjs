@@ -7,6 +7,10 @@ const walk = (dir) => fs.readdirSync(path.join(root,dir),{withFileTypes:true}).f
   const p=path.join(dir,e.name); return e.isDirectory()?walk(p):[p.replaceAll(path.sep,'/')];
 });
 const api = read('lib/server/api.ts');
+const proxy = read('proxy.ts');
+if (!/matcher\s*:\s*\[[^\]]*\(\?!api\|/.test(proxy)) {
+  throw new Error('Proxy matcher must exclude API routes; API handlers perform their own authentication and authorization.');
+}
 const migration = read('supabase/migrations/0043_final_security_scalability_hardening.sql');
 const declared = [...api.matchAll(/action:\s*'([^']+)'(?:\s*\|\s*'([^']+)')+/g)][0];
 if(!declared) throw new Error('Could not parse rate-limit action union');
