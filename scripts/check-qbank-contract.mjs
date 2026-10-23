@@ -10,6 +10,7 @@ const keyTerms = read('supabase/migrations/0034_key_terms_precision.sql');
 const player = read('components/qbank/qbank-session-player.tsx');
 const result = read('app/(app)/qbank/session/[sessionId]/result/page.tsx');
 const startApi = read('app/api/qbank/session/start/route.ts');
+const configurator = read('components/qbank/qbank-configurator.tsx');
 const legacyNext = read('app/api/qbank/next/route.ts');
 const legacyAnswer = read('app/api/qbank/answer/route.ts');
 const messages = read('lib/i18n/messages.ts');
@@ -31,6 +32,8 @@ must(/legacy_qbank_disabled/.test(legacyNext) && /legacy_qbank_disabled/.test(le
 must(/exam_id:\s*string;/.test(result) && /exam_code:\s*string;/.test(result), 'result contract must have clean exam_id/exam_code fields');
 for (const field of ['duration_seconds','marked_count','note_count']) must(new RegExp(field).test(result), `result contract missing ${field}`);
 must(/examId/.test(startApi), 'start API must accept exam id');
+must(/poolCountsReady/.test(configurator) && /poolCountsKey/.test(configurator), 'session builder must wait for pool counts matching the active filters');
+must(/insufficientPoolCount/.test(configurator) && /poolShortageMessage/.test(configurator), 'session builder must explain when the selected pool has fewer questions than requested');
 for (const key of ['poolUnanswered','blockTime','breakAvailable','takeBreak','onBreak','breakRemaining','resumeExam','breakUnavailable','couldNotResume','unmark','yourAnswer','practiceUnanswered','explanation']) {
   const count = (messages.match(new RegExp(key + ':', 'g')) || []).length;
   must(count >= 4, `translation key ${key} is missing from one or more locales`);
