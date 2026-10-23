@@ -10,7 +10,7 @@ import { ThemeToggle } from '@/components/i18n/theme-toggle';
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ security?: string }> }) {
     const params = await searchParams;
-    const { messages: m } = await getI18n();
+    const { messages: m, locale } = await getI18n();
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
@@ -19,6 +19,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         supabase.from('profiles').select('full_name,role,active_exam_id,leaderboard_visible').eq('id', user.id).maybeSingle(),
         supabase.from('exams').select('id,code,name').order('name'),
     ]);
+    const { data: subscriptionData } = await supabase.rpc('my_subscription_status').maybeSingle();
+    const subscription = subscriptionData as { is_active: boolean; subscription_until: string | null } | null;
 
     const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
     const needsAdminMfa = isAdmin && params.security === 'mfa_required';
@@ -37,6 +39,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <section className="card card-pad settings-preference-card"><div className="kicker">{m.settings.exam}</div><h2 className="section-heading">{m.settings.activeExam}</h2><ExamSelector exams={exams ?? []} current={profile?.active_exam_id ?? null}/></section>
         <section className="card card-pad settings-preference-card"><div className="kicker">{m.settings.preferences}</div><h2 className="section-heading">{m.settings.language}</h2><p className="panel-sub">{m.settings.languageHelp}</p><LocaleSwitcher /></section>
         <section className="card card-pad settings-preference-card"><div className="kicker">{m.settings.preferences}</div><h2 className="section-heading">{m.settings.appearance}</h2><p className="panel-sub">{m.settings.appearanceHelp}</p><div className="settings-appearance-control"><span>{m.settings.darkMode}</span><ThemeToggle /></div></section>
+        <section className="card card-pad settings-preference-card"><div className="kicker">{m.settings.secureStudy}</div><h2 className="section-heading">{m.settings.secureStudy}</h2><p className="panel-sub">{m.settings.secureStudyHelp}</p></section>
+        <section className="card card-pad settings-preference-card"><div className="kicker">{m.settings.subscription}</div><h2 className="section-heading">{subscription?.is_active ? m.settings.subscriptionActive : m.settings.subscriptionInactive}</h2>{subscription?.is_active && <p className="panel-sub">{subscription.subscription_until ? `${m.settings.subscriptionUntil} ${new Date(subscription.subscription_until).toLocaleDateString(locale)}` : m.settings.subscriptionNoExpiry}</p>}</section>
         <section className="card card-pad settings-preference-card"><div className="kicker">{m.settings.session}</div><h2 className="section-heading">{m.settings.signOut}</h2><p className="panel-sub field-note-bottom">{m.settings.endSession}</p><SignOutButton /></section>
       </div>
       {isAdmin && !needsAdminMfa ? <div className="settings-danger-card"><AdminMfaSetup returnTo="/admin"/></div> : null}

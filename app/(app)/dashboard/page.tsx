@@ -50,7 +50,7 @@ export default async function DashboardPage() {
       <div className="eyebrow">{m.dashboard.eyebrow}</div>
       <h1>{m.dashboard.title}</h1>
       <p className="subtitle">{m.dashboard.subtitle}</p>
-      <div className="dashboard-welcome-meta"><span><Icon name="book" size={13}/>{hasExam ? (activeExam?.code ?? m.settings.activeExam) : m.shell.chooseExam}</span><span><Icon name="shield" size={13}/>{m.shell.secure}</span></div>
+        <div className="dashboard-welcome-meta"><span><Icon name="book" size={13}/>{hasExam ? (activeExam?.code ?? m.settings.activeExam) : m.shell.chooseExam}</span></div>
     </div>
     <div className="dashboard-question-progress" role="img" aria-label={questionProgress
       ? `${competitiveCopy.answered}: ${questionProgress.answered} of ${questionProgress.total}, ${ringProgress} percent`

@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/server/authorization';
 import { UserControls } from '@/components/admin/user-controls';
 import { CreateUserForm } from '@/components/admin/create-user-form';
+import { AnnouncementComposer } from '@/components/admin/announcement-composer';
 
 type UserAccessRow = {
   id: string;
@@ -26,6 +27,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   return <div className="admin-page">
     <div className="admin-page-head"><div><div className="eyebrow">Identity & lifecycle</div><h1>Users & access</h1><p className="subtitle">Manage accounts, passwords, manual premium access and account status. Administrative changes are recorded in the audit log.</p></div></div>
     <CreateUserForm/>
+    <AnnouncementComposer />
     <section className="card card-pad admin-filters"><form className="admin-filter-form"><input name="q" defaultValue={q ?? ''} placeholder="Search by name or email…"/><button className="btn btn-primary" type="submit">Search users</button>{q && <a className="btn" href="/admin/users">Clear</a>}</form></section>
     <section className="card admin-table-wrap"><table className="admin-table">
       <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Premium access</th><th>Created</th><th>Last seen</th><th>Actions</th></tr></thead>

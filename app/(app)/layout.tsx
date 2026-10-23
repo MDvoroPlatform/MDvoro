@@ -11,7 +11,6 @@ export default async function ProtectedLayout({ children }: {
         redirect('/login');
     const { data: profile } = await supabase.from('profiles').select('full_name,role,active_exam_id,account_status').eq('id', user.id).maybeSingle();
     if (profile?.account_status === 'suspended') redirect('/account-suspended');
-    const { data: exam } = profile?.active_exam_id ? await supabase.from('exams').select('code,name').eq('id', profile.active_exam_id).maybeSingle() : { data: null };
-    return <AppShell userName={profile?.full_name ?? user.email} role={profile?.role} examLabel={exam?.code ?? 'Choose exam'}>{children}</AppShell>;
+    return <AppShell userName={profile?.full_name ?? user.email} role={profile?.role}>{children}</AppShell>;
 }
 

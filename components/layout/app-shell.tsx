@@ -1,19 +1,17 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Icon } from '@/components/ui/icons';
 import { MobileNavDrawer, PrimaryNav } from '@/components/layout/primary-nav';
-import { LocaleSwitcher } from '@/components/i18n/locale-switcher';
-import { ThemeToggle } from '@/components/i18n/theme-toggle';
+import { GlobalQuestionSearch } from '@/components/layout/global-question-search';
+import { NotificationBell } from '@/components/layout/notification-bell';
 import { getI18n } from '@/lib/i18n/server';
 import { PresenceHeartbeat } from '@/components/presence/presence-heartbeat';
 import { MDvoroLogo } from '@/components/layout/mdvoro-logo';
 import { HomeLogoLink } from '@/components/layout/home-logo-link';
 import { MDvoroFooter } from '@/components/layout/mdvoro-footer';
-export async function AppShell({ children, userName, role, examLabel }: {
+export async function AppShell({ children, userName, role }: {
     children: ReactNode;
     userName?: string | null;
     role?: string | null;
-    examLabel?: string | null;
 }) {
     const { messages: m } = await getI18n();
     const staff = ['super_admin', 'admin', 'editor', 'reviewer', 'support'].includes(role ?? '');
@@ -37,22 +35,8 @@ export async function AppShell({ children, userName, role, examLabel }: {
             </div>
             <MobileNavDrawer staff={staff} userName={userName}/>
           </div>
-          <div className="topbar-search">
-            <label className="search" aria-label={m.common.search}>
-              <Icon name="search" size={15}/>
-              <input aria-label={m.common.search} placeholder={m.library.searchPlaceholder} onKeyDown={undefined} />
-              <span className="search-shortcut">⌘ K</span>
-            </label>
-          </div>
-          <div className="exam-select">
-            <span className="exam-icon"><Icon name="book" size={15}/></span>
-            <span>{examLabel ?? m.shell.chooseExam}</span>
-          </div>
-          <div className="topbar-center">
-            <span className="topbar-status-dot" aria-hidden="true"/>
-            <span>{m.shell.secure}</span>
-          </div>
-          <div className="topbar-tools"><LocaleSwitcher /><ThemeToggle /></div>
+          <GlobalQuestionSearch />
+          <div className="topbar-tools"><NotificationBell /></div>
           <div className="user-menu">
             <div className="avatar" aria-hidden="true">{(userName?.trim()?.[0] ?? 'S').toUpperCase()}</div>
             <div className="user-copy"><strong>{userName || m.shell.student}</strong><span>{role ?? 'student'}</span></div>
