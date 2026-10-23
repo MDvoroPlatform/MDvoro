@@ -11,6 +11,9 @@ const player = read('components/qbank/qbank-session-player.tsx');
 const result = read('app/(app)/qbank/session/[sessionId]/result/page.tsx');
 const startApi = read('app/api/qbank/session/start/route.ts');
 const configurator = read('components/qbank/qbank-configurator.tsx');
+const builderMigration = read('supabase/migrations/0055_qbank_session_builder.sql');
+const builderTreeApi = read('app/api/qbank/builder/tree/route.ts');
+const builderStartApi = read('app/api/qbank/builder/start/route.ts');
 const legacyNext = read('app/api/qbank/next/route.ts');
 const legacyAnswer = read('app/api/qbank/answer/route.ts');
 const messages = read('lib/i18n/messages.ts');
@@ -32,8 +35,13 @@ must(/legacy_qbank_disabled/.test(legacyNext) && /legacy_qbank_disabled/.test(le
 must(/exam_id:\s*string;/.test(result) && /exam_code:\s*string;/.test(result), 'result contract must have clean exam_id/exam_code fields');
 for (const field of ['duration_seconds','marked_count','note_count']) must(new RegExp(field).test(result), `result contract missing ${field}`);
 must(/examId/.test(startApi), 'start API must accept exam id');
-must(/poolCountsReady/.test(configurator) && /poolCountsKey/.test(configurator), 'session builder must wait for pool counts matching the active filters');
-must(/insufficientPoolCount/.test(configurator) && /poolShortageMessage/.test(configurator), 'session builder must explain when the selected pool has fewer questions than requested');
+must(/\/api\/qbank\/builder\/tree/.test(configurator) && /available/.test(configurator), 'session builder must show live server-side availability');
+must(/\/api\/qbank\/builder\/start/.test(configurator) && /disabled=\{busy \|\| loading/.test(configurator), 'session builder must not start before current filter counts are ready');
+must(/qbank_builder_filter_tree/.test(builderMigration) && /qbank_builder_filter_tree/.test(builderTreeApi), 'filter tree must come from the authenticated server RPC');
+must(/start_qbank_builder_session/.test(builderMigration) && /start_qbank_builder_session/.test(builderStartApi), 'filtered session selection must stay server-side');
+must(/sourceIds/.test(configurator) && /topicIds/.test(configurator) && /difficulties/.test(configurator), 'builder selection must include sources, topics, and difficulty');
+must(/qbank_sources/.test(builderMigration) && /reconstruction_year/.test(builderMigration), 'source tree must include dynamic reconstruction-year nodes');
+must(/aria-expanded/.test(configurator) && /openPanel/.test(configurator), 'builder pickers must start collapsed and expose expanded state');
 for (const key of ['poolUnanswered','blockTime','breakAvailable','takeBreak','onBreak','breakRemaining','resumeExam','breakUnavailable','couldNotResume','unmark','yourAnswer','practiceUnanswered','explanation']) {
   const count = (messages.match(new RegExp(key + ':', 'g')) || []).length;
   must(count >= 4, `translation key ${key} is missing from one or more locales`);

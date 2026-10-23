@@ -1,60 +1,263 @@
 'use client';
+
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { Icon } from '@/components/ui/icons';
 import { useI18n } from '@/components/i18n/provider';
+import { getDisciplineSelectionState, toggleDisciplineSelection, toggleTopicSelection } from '@/lib/qbank/builder-selection';
 
-type Exam={id:string;code:string;name:string};
-type Catalog={topics_by_subject:{subject:string;topic:string}[];exam:{id:string;code:string;name:string;total_duration_minutes:number;max_items:number;block_duration_minutes:number;block_max_items:number;block_count:number;break_minutes:number;previous_block_review_allowed:boolean;official_max_items:number;product_max_items:number;timing_verified:boolean;timing_source:string;timing_notes:string|null};subjects:{value:string;label:string}[];topics:string[];available_questions:number};
-type PoolCounts={total:number;unseen:number;answered:number;unanswered:number;incorrect:number;bookmarked:number};
-type Pool='mixed'|'unseen'|'incorrect'|'answered'|'unanswered'|'bookmarked';
-type ReconstructionYear={year:number;question_count:number};
-const subjectLabels:Record<string,Record<string,string>>={
- 'Internal Medicine':{en:'Internal Medicine',he:'רפואה פנימית',ar:'الطب الباطني',ru:'Внутренняя медицина'},
- Pediatrics:{en:'Pediatrics',he:'רפואת ילדים',ar:'طب الأطفال',ru:'Педиатрия'},
- Surgery:{en:'Surgery',he:'כירורגיה',ar:'الجراحة',ru:'Хирургия'},
- Psychiatry:{en:'Psychiatry',he:'פסיכיאטריה',ar:'الطب النفسي',ru:'Психиатрия'},
- 'Obstetrics & Gynecology':{en:'Obstetrics & Gynecology',he:'מיילדות וגינקולוגיה',ar:'النسائية والتوليد',ru:'Акушерство и гинекология'},
- Anatomy:{en:'Anatomy',he:'אנטומיה',ar:'التشريح',ru:'Анатомия'},
- Physiology:{en:'Physiology',he:'פיזיולוגיה',ar:'علم وظائف الأعضاء',ru:'Физиология'},
- Biochemistry:{en:'Biochemistry',he:'ביוכימיה',ar:'الكيمياء الحيوية',ru:'Биохимия'},
- Pathology:{en:'Pathology',he:'פתולוגיה',ar:'علم الأمراض',ru:'Патология'},
- Pharmacology:{en:'Pharmacology',he:'פרמקולוגיה',ar:'علم الأدوية',ru:'Фармакология'},
- Microbiology:{en:'Microbiology',he:'מיקרוביולוגיה',ar:'علم الأحياء الدقيقة',ru:'Микробиология'},
- 'Behavioral Sciences':{en:'Behavioral Sciences',he:'מדעי ההתנהגות',ar:'العلوم السلوكية',ru:'Поведенческие науки'},
- 'Biostatistics & Epidemiology':{en:'Biostatistics & Epidemiology',he:'ביוסטטיסטיקה ואפידמיולוגיה',ar:'الإحصاء الحيوي وعلم الوبائيات',ru:'Биостатистика и эпидемиология'},
- Ethics:{en:'Ethics',he:'אתיקה',ar:'الأخلاقيات',ru:'Этика'}
+type Exam = { id: string; code: string; name: string };
+type Pool = 'mixed' | 'unseen' | 'incorrect' | 'answered' | 'unanswered' | 'bookmarked';
+type Status = 'all' | 'unanswered' | 'incorrect' | 'saved' | 'notes';
+type Source = { id: string; key: string; name: string; kind: string; count: number; children: Source[] };
+type Topic = { id: string; name: string; count: number; isOthers: boolean };
+type Discipline = { value: string; label: string; count: number; topics: Topic[] };
+type Tree = { sources: Source[]; disciplines: Discipline[]; available: number };
+type Catalog = { exam: { product_max_items?: number; official_max_items?: number; max_items?: number; block_max_items: number; block_duration_minutes: number; block_count: number; total_duration_minutes: number; timing_verified?: boolean } };
+type Filters = {
+  allSources: boolean;
+  sourceIds: string[];
+  allDisciplines: boolean;
+  fullSubjects: string[];
+  topicIds: string[];
+  status: Status;
+  difficulties: number[];
+  mode: 'practice' | 'exam';
+  questionCount: number;
 };
-export function QBankConfigurator({ exams, currentExamId, initialPool, initialExamId, fullExam=false }:{exams:Exam[];currentExamId?:string|null;initialPool?:Pool;initialExamId?:string|null;fullExam?:boolean}){
- const {messages:m,locale}=useI18n(); const router=useRouter();
- const reconstructionCopy={en:{label:'Historical reconstructions',any:'All questions',hint:'Practice a specific reconstructed exam year.'},he:{label:'שחזורים היסטוריים',any:'כל השאלות',hint:'תרגול שחזור של שנה מסוימת.'},ar:{label:'إعادات الامتحان التاريخية',any:'كل الأسئلة',hint:'تدرّب على إعادة بناء سنة محددة.'},ru:{label:'Исторические реконструкции',any:'Все вопросы',hint:'Практика реконструкции по конкретному году.'}}[locale];
- const [poolCounts,setPoolCounts]=useState<PoolCounts|null>(null); const [poolCountsKey,setPoolCountsKey]=useState(''); const [poolCountsErrorKey,setPoolCountsErrorKey]=useState(''); const [examId,setExamId]=useState(initialExamId??currentExamId??exams[0]?.id??''); const [catalog,setCatalog]=useState<Catalog|null>(null); const [subjects,setSubjects]=useState<string[]>([]); const [topics,setTopics]=useState<string[]>([]); const [count,setCount]=useState(20); const [mode,setMode]=useState<'practice'|'exam'>('practice'); const [pool,setPool]=useState<Pool>(initialPool??'mixed'); const [reconstructionYears,setReconstructionYears]=useState<ReconstructionYear[]>([]); const [reconstructionYear,setReconstructionYear]=useState<number|null>(null); const [busy,setBusy]=useState(false); const [message,setMessage]=useState('');
- useEffect(()=>{if(!examId)return; const controller=new AbortController(); Promise.all([fetch(`/api/qbank/catalog?examId=${encodeURIComponent(examId)}`,{signal:controller.signal,cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok)throw new Error();return b;}),fetch(`/api/qbank/reconstruction-years?examId=${encodeURIComponent(examId)}`,{signal:controller.signal,cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok)throw new Error();return b as ReconstructionYear[];})]).then(([b,years])=>{setCatalog(b);setReconstructionYears(years);setSubjects([]);setTopics([]);}).catch(e=>{if(e?.name!=='AbortError')setMessage(m.qbank.couldNotLoad);});return()=>controller.abort();},[examId,m.qbank.couldNotLoad]);
- const maxCount=mode==='exam' ? Math.min(300,catalog?.exam.product_max_items??300,catalog?.exam.official_max_items??300):Math.min(300,catalog?.exam.product_max_items??300); const effectiveCount=Math.min(count,maxCount); const currentPoolCountsKey=JSON.stringify({examId,subjects,topics,reconstructionYear}); const poolCountsReady=Boolean(poolCounts&&poolCountsKey===currentPoolCountsKey); const poolCountsLoading=Boolean(catalog&&poolCountsKey!==currentPoolCountsKey&&poolCountsErrorKey!==currentPoolCountsKey); const poolCountsError=poolCountsErrorKey===currentPoolCountsKey; const selectedPoolCount=poolCountsReady?(pool==='mixed'?poolCounts?.total:poolCounts?.[pool])??null:null; const insufficientPoolCount=selectedPoolCount!==null&&selectedPoolCount<effectiveCount;
- const poolShortageMessage=selectedPoolCount===null?'':locale==='ar'?`المتاح ${selectedPoolCount} سؤالًا فقط؛ قلّل العدد أو اختر مجموعة أخرى.`:locale==='he'?`זמינות רק ${selectedPoolCount} שאלות תואמות; הקטן את הכמות או בחר מאגר אחר.`:locale==='ru'?`Доступно только ${selectedPoolCount} подходящих вопросов; уменьшите количество или выберите другой пул.`:`Only ${selectedPoolCount} matching questions are available. Reduce the count or choose another pool.`;
- const poolCountsErrorMessage=locale==='ar'?'تعذّر التحقق من عدد الأسئلة المتاحة. حاول مرة أخرى.':locale==='he'?'לא ניתן לבדוק את מספר השאלות הזמינות. נסו שוב.':locale==='ru'?'Не удалось проверить число доступных вопросов. Повторите попытку.':'Could not check the available question count. Please try again.';
- const topicOptions=useMemo(()=>{if(!catalog)return [];const list=subjects.length?catalog.topics_by_subject.filter(x=>subjects.includes(x.subject)).map(x=>x.topic):catalog.topics;return [...new Set(list)];},[catalog,subjects]);
- const changeSubjects=(next:string[])=>{const options=next.length?catalog?.topics_by_subject.filter(x=>next.includes(x.subject)).map(x=>x.topic)??[]:catalog?.topics??[];setSubjects(next);setTopics(selected=>selected.filter(topic=>options.includes(topic)));};
 
+const copy = {
+  en: { exam: 'Exam', basic: 'Basic settings', source: 'Sources', disciplines: 'Disciplines and topics', advanced: 'Advanced settings', all: 'All', none: 'Clear selection', selected: 'selected', allSources: 'All sources', allDisciplines: 'All disciplines', chooseExam: 'Choose an exam', mode: 'Mode', practice: 'Practice', examMode: 'Exam mode', status: 'Question status', difficulty: 'Difficulty', questionCount: 'Number of questions', easy: 'Easy', medium: 'Medium', hard: 'Hard', allStatus: 'All questions', unanswered: 'Unanswered', incorrect: 'Incorrect', saved: 'Saved / marked', notes: 'With notes', search: 'Search disciplines and topics', available: 'Available', start: 'Start session', loading: 'Loading filters…', loadingExam: 'Loading exam data…', noSources: 'No sources available for this exam yet.', noDisciplines: 'No disciplines are configured for this exam yet.', noQuestions: 'There are no questions for this selection.', loadError: 'Could not load the filter list. Try again.', reset: 'Reset', max: 'Maximum', minQuestion: 'Minimum 1 question', selectTopic: 'Select topic', expand: 'Expand', collapse: 'Collapse', statusAll: 'Use all eligible questions', startError: 'Could not start the session. Please try again.', insufficient: 'There are not enough matching questions for this number.', examLimit: 'This number is above the exam limit.', timer: 'Estimated time', untimed: 'No forced timer', min: 'min', questions: 'questions', countSummary: 'questions available' },
+  ar: { exam: 'الامتحان', basic: 'الإعدادات الأساسية', source: 'المصادر', disciplines: 'التخصصات والمواضيع', advanced: 'إعدادات متقدمة', all: 'الكل', none: 'مسح الاختيار', selected: 'محدد', allSources: 'كل المصادر', allDisciplines: 'كل التخصصات', chooseExam: 'اختر امتحانًا', mode: 'النمط', practice: 'تدريب', examMode: 'نمط الامتحان', status: 'حالة السؤال', difficulty: 'الصعوبة', questionCount: 'عدد الأسئلة', easy: 'سهل', medium: 'متوسط', hard: 'صعب', allStatus: 'كل الأسئلة', unanswered: 'غير مجابة', incorrect: 'أُجيب عنها خطأ', saved: 'محفوظة / معلّمة', notes: 'لها ملاحظات', search: 'ابحث في التخصصات والمواضيع', available: 'المتاح', start: 'ابدأ الجلسة', loading: 'جارٍ تحميل المرشحات…', loadingExam: 'جارٍ تحميل بيانات الامتحان…', noSources: 'لا توجد مصادر مضافة لهذا الامتحان بعد.', noDisciplines: 'لا توجد تخصصات مهيأة لهذا الامتحان بعد.', noQuestions: 'لا توجد أسئلة مطابقة لهذا الاختيار.', loadError: 'تعذر تحميل المرشحات. حاول مرة أخرى.', reset: 'إعادة ضبط', max: 'الحد الأقصى', minQuestion: 'سؤال واحد على الأقل', selectTopic: 'اختر الموضوع', expand: 'توسيع', collapse: 'طي', statusAll: 'استخدم كل الأسئلة المطابقة', startError: 'تعذر بدء الجلسة. حاول مرة أخرى.', insufficient: 'عدد الأسئلة المطابقة أقل من العدد المطلوب.', examLimit: 'العدد يتجاوز حد الامتحان.', timer: 'الوقت التقديري', untimed: 'دون مؤقت إلزامي', min: 'دقيقة', questions: 'أسئلة', countSummary: 'سؤال متاح' },
+  he: { exam: 'בחינה', basic: 'הגדרות בסיסיות', source: 'מקורות', disciplines: 'תחומים ונושאים', advanced: 'הגדרות מתקדמות', all: 'הכול', none: 'נקה בחירה', selected: 'נבחרו', allSources: 'כל המקורות', allDisciplines: 'כל התחומים', chooseExam: 'בחירת בחינה', mode: 'מצב', practice: 'תרגול', examMode: 'מצב בחינה', status: 'מצב השאלה', difficulty: 'רמת קושי', questionCount: 'מספר שאלות', easy: 'קל', medium: 'בינוני', hard: 'קשה', allStatus: 'כל השאלות', unanswered: 'ללא מענה', incorrect: 'שגויות', saved: 'שמורות / מסומנות', notes: 'עם הערות', search: 'חיפוש בתחומים ובנושאים', available: 'זמינות', start: 'התחלת מפגש', loading: 'טוען מסננים…', loadingExam: 'טוען נתוני בחינה…', noSources: 'אין עדיין מקורות לבחינה זו.', noDisciplines: 'אין עדיין תחומים שהוגדרו לבחינה זו.', noQuestions: 'אין שאלות לבחירה זו.', loadError: 'לא ניתן לטעון את המסננים. נסו שוב.', reset: 'איפוס', max: 'מקסימום', minQuestion: 'לפחות שאלה אחת', selectTopic: 'בחירת נושא', expand: 'הרחבה', collapse: 'צמצום', statusAll: 'כל השאלות המתאימות', startError: 'לא ניתן להתחיל את המפגש. נסו שוב.', insufficient: 'אין מספיק שאלות מתאימות למספר הזה.', examLimit: 'המספר חורג ממגבלת הבחינה.', timer: 'זמן משוער', untimed: 'ללא טיימר מחייב', min: 'דקות', questions: 'שאלות', countSummary: 'שאלות זמינות' },
+  ru: { exam: 'Экзамен', basic: 'Основные настройки', source: 'Источники', disciplines: 'Дисциплины и темы', advanced: 'Дополнительные настройки', all: 'Все', none: 'Сбросить выбор', selected: 'выбрано', allSources: 'Все источники', allDisciplines: 'Все дисциплины', chooseExam: 'Выбрать экзамен', mode: 'Режим', practice: 'Практика', examMode: 'Режим экзамена', status: 'Статус вопроса', difficulty: 'Сложность', questionCount: 'Количество вопросов', easy: 'Легко', medium: 'Средне', hard: 'Сложно', allStatus: 'Все вопросы', unanswered: 'Без ответа', incorrect: 'С ошибками', saved: 'Сохранённые / отмеченные', notes: 'С заметками', search: 'Поиск по дисциплинам и темам', available: 'Доступно', start: 'Начать сессию', loading: 'Загрузка фильтров…', loadingExam: 'Загрузка данных экзамена…', noSources: 'Для этого экзамена пока нет источников.', noDisciplines: 'Для этого экзамена пока не настроены дисциплины.', noQuestions: 'Для этого выбора нет вопросов.', loadError: 'Не удалось загрузить фильтры. Повторите попытку.', reset: 'Сбросить', max: 'Максимум', minQuestion: 'Минимум 1 вопрос', selectTopic: 'Выбрать тему', expand: 'Развернуть', collapse: 'Свернуть', statusAll: 'Все подходящие вопросы', startError: 'Не удалось начать сессию. Повторите попытку.', insufficient: 'Подходящих вопросов меньше, чем указано.', examLimit: 'Количество превышает лимит экзамена.', timer: 'Примерное время', untimed: 'Без обязательного таймера', min: 'мин', questions: 'вопросов', countSummary: 'доступных вопросов' },
+} as const;
 
- useEffect(()=>{if(!catalog)return; const controller=new AbortController(); const key=JSON.stringify({examId,subjects,topics,reconstructionYear}); fetch('/api/qbank/pool-counts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({examId,subjects,topics,reconstructionYear}),signal:controller.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error();return r.json() as Promise<PoolCounts>;}).then(counts=>{setPoolCounts(counts);setPoolCountsKey(key);setPoolCountsErrorKey('');}).catch(()=>{if(!controller.signal.aborted){setPoolCounts(null);setPoolCountsErrorKey(key);}}); return()=>controller.abort();},[catalog,examId,subjects,topics,reconstructionYear]);
- const estimatedExamMinutes=useMemo(()=>catalog?Math.max(1,Math.ceil(effectiveCount/Math.max(1,catalog.exam.block_max_items))*catalog.exam.block_duration_minutes):0,[catalog,effectiveCount]);
- const officialTiming=Boolean(catalog?.exam.timing_verified && mode==='exam' && effectiveCount>=catalog?.exam.official_max_items);
- async function start(){setMessage(''); if(!examId||!catalog)return; if(effectiveCount<1||effectiveCount>maxCount)return; if(poolCountsLoading||!poolCountsReady){setMessage(poolCountsError?poolCountsErrorMessage:m.common.loading);return;} if(insufficientPoolCount){setMessage(poolShortageMessage);return;} setBusy(true); try{const res=await fetch('/api/qbank/session/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({examId,subjects,topics,questionCount:effectiveCount,mode,pool,reconstructionYear})});const body=await res.json().catch(()=>({})); if(!res.ok){setMessage(body.error==='insufficient_questions'?m.qbank.insufficient:body.error==='exam_question_limit'?m.qbank.examLimit:body.error==='account_inactive'?m.settings.accountSuspended:m.qbank.couldNotStart);return;} router.push(`/qbank/session/${body.sessionId}`);}catch{setMessage(m.qbank.couldNotStart);}finally{setBusy(false);}}
- return <section className="qbank-builder card card-pad">
-   <div className="builder-head"><div><div className="kicker">{m.qbank.setupKicker}</div><h2>{m.qbank.setupTitle}</h2><p className="panel-sub">{m.qbank.setupSubtitle}</p></div><a className="btn" href="/qbank/history">{m.qbank.history}</a></div>
-   <div className="builder-grid">
-     <label className="field"><span>{m.qbank.exam}</span><select value={examId} onChange={e=>{setMessage('');setPoolCounts(null);setReconstructionYear(null);setCatalog(null);setSubjects([]);setTopics([]);setExamId(e.target.value);}}>{exams.map(e=><option key={e.id} value={e.id}>{e.code} — {e.name}</option>)}</select></label>
-     <label className="field"><span>{reconstructionCopy.label}</span><select value={reconstructionYear ?? ''} onChange={e=>setReconstructionYear(e.target.value ? Number(e.target.value) : null)}><option value="">{reconstructionCopy.any}</option>{reconstructionYears.map(row=><option key={row.year} value={row.year}>שחזור {row.year} · {row.question_count}</option>)}</select><small className="field-note">{reconstructionCopy.hint}</small></label>
-     <div className="field"><div className="field-label-row"><span>{m.qbank.subjectsLabel}</span><div className="filter-actions"><button className="btn btn-sm" type="button" onClick={()=>changeSubjects((catalog?.subjects??[]).map(s=>s.value))}>{m.common.all}</button><button className="btn btn-sm" type="button" onClick={()=>changeSubjects([])}>{m.common.clear}</button></div></div><div className="chip-grid">{(catalog?.subjects??[]).map(s=><label key={s.value} className={`filter-chip ${subjects.includes(s.value)?'selected':''}`}><input type="checkbox" checked={subjects.includes(s.value)} onChange={e=>changeSubjects(e.target.checked?[...subjects,s.value]:subjects.filter(x=>x!==s.value))}/><span>{subjectLabels[s.value]?.[locale]??s.label}</span></label>)}</div></div>
-     <div className="field"><div className="field-label-row"><span>{m.qbank.topicsLabel}</span><div className="filter-actions"><button className="btn btn-sm" type="button" onClick={()=>setTopics(topicOptions)}>{m.common.all}</button><button className="btn btn-sm" type="button" onClick={()=>setTopics([])}>{m.common.clear}</button></div></div><div className="chip-grid compact">{topicOptions.length?topicOptions.map(t=><label key={t} className={`filter-chip ${topics.includes(t)?'selected':''}`}><input type="checkbox" checked={topics.includes(t)} onChange={e=>setTopics(v=>e.target.checked?[...v,t]:v.filter(x=>x!==t))}/><span>{t}</span></label>):<span className="form-hint">{m.qbank.noTopics}</span>}</div></div>
-     <label className="field"><span>{m.qbank.questionCount}</span><div className="count-row"><input type="number" min={1} max={maxCount} value={effectiveCount} onChange={e=>setCount(Math.max(1,Math.min(maxCount,Number(e.target.value)||1)))}/><span className="field-note">{m.qbank.upTo300}{mode==='exam'?` · ${m.qbank.examCap} ${maxCount} · ${catalog?.exam.official_max_items} ${m.qbank.officialTiming}`:''}</span></div></label>
-     <div className="field"><span>{m.qbank.mode}</span><div className="mode-switch"><button type="button" className={mode==='practice'?'active':''} onClick={()=>setMode('practice')}>{m.qbank.practiceMode}</button><button type="button" className={mode==='exam'?'active':''} onClick={()=>setMode('exam')}>{m.qbank.examMode}</button></div></div>
-     <label className="field"><span>{m.qbank.pool}</span><select value={pool} onChange={e=>setPool(e.target.value as Pool)}><option value="mixed">{m.qbank.poolMixed} {poolCounts?`(${poolCounts.total})`:''}</option><option value="unseen">{m.qbank.poolUnseen} {poolCounts?`(${poolCounts.unseen})`:''}</option><option value="incorrect">{m.qbank.poolIncorrect} {poolCounts?`(${poolCounts.incorrect})`:''}</option><option value="answered">{m.qbank.poolAnswered} {poolCounts?`(${poolCounts.answered})`:''}</option><option value="unanswered">{m.qbank.poolUnanswered} {poolCounts?`(${poolCounts.unanswered})`:''}</option><option value="bookmarked">{m.qbank.poolBookmarked} {poolCounts?`(${poolCounts.bookmarked})`:''}</option></select></label>
-   </div>
-   {catalog&&<div className="exam-rules-strip"><span>{catalog.exam.code}</span><span>{m.qbank.realTime}: {mode==='exam' ? (officialTiming ? `${catalog.exam.total_duration_minutes} min · ${m.qbank.officialTiming}` : `${estimatedExamMinutes} min · ${m.qbank.scaledTiming}`) : m.qbank.noForcedTimer}</span><span>{m.qbank.blocks}: {Math.max(1,Math.min(catalog.exam.block_count,Math.ceil(effectiveCount/Math.max(1,catalog.exam.block_max_items))))}</span><span>{m.qbank.available}: {catalog.available_questions}</span></div>}
-   {insufficientPoolCount&&<div className="form-message error" role="status">{poolShortageMessage}</div>}
-   {poolCountsError&&<div className="form-message error" role="status">{poolCountsErrorMessage}</div>}
-   {message&&<div className="form-message error" role="alert">{message}</div>}
-   <div className="builder-actions"><button type="button" className="btn btn-primary btn-lg" disabled={busy||!catalog||poolCountsLoading||!poolCountsReady||insufficientPoolCount||effectiveCount>maxCount} onClick={()=>void start()}>{busy?m.common.loading:m.qbank.startSession}</button><span className="panel-sub">{poolCountsLoading?m.common.loading:m.qbank.serverSelection}</span></div>
- </section>;
+const emptyFilters = (questionCount = 20): Filters => ({ allSources: true, sourceIds: [], allDisciplines: true, fullSubjects: [], topicIds: [], status: 'all', difficulties: [], mode: 'practice', questionCount });
+
+export function QBankConfigurator({ exams, currentExamId, initialPool, initialExamId, fullExam = false }: { exams: Exam[]; currentExamId?: string | null; initialPool?: Pool; initialExamId?: string | null; fullExam?: boolean }) {
+  const { messages: m, locale } = useI18n();
+  const router = useRouter();
+  const t = copy[(locale in copy ? locale : 'en') as keyof typeof copy];
+  const defaultStatus: Status = initialPool === 'incorrect' ? 'incorrect' : initialPool === 'unanswered' || initialPool === 'unseen' ? 'unanswered' : initialPool === 'bookmarked' ? 'saved' : 'all';
+  const [examId, setExamId] = useState(initialExamId ?? currentExamId ?? exams[0]?.id ?? '');
+  const [filters, setFilters] = useState<Filters>(() => ({ ...emptyFilters(), mode: fullExam ? 'exam' : 'practice', status: defaultStatus }));
+  const [loadedExam, setLoadedExam] = useState('');
+  const [tree, setTree] = useState<Tree | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [openPanel, setOpenPanel] = useState<string | null>(null);
+  const [expandedSources, setExpandedSources] = useState<string[]>([]);
+  const [expandedDisciplines, setExpandedDisciplines] = useState<string[]>([]);
+  const [topicSearch, setTopicSearch] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const maxCount = Math.max(1, Math.min(300, catalog?.exam.product_max_items ?? catalog?.exam.max_items ?? 300, filters.mode === 'exam' ? catalog?.exam.official_max_items ?? catalog?.exam.max_items ?? 300 : 300));
+  const available = tree?.available ?? 0;
+  const effectiveCount = Math.max(1, Math.min(filters.questionCount, maxCount, available || maxCount));
+  const treePayload = useMemo(() => ({
+    examId, allSources: filters.allSources, sourceIds: filters.sourceIds,
+    allDisciplines: filters.allDisciplines, fullSubjects: filters.fullSubjects,
+    topicIds: filters.topicIds, otherSubjects: [], status: filters.status,
+    difficulties: filters.difficulties,
+  }), [examId, filters.allSources, filters.sourceIds, filters.allDisciplines, filters.fullSubjects, filters.topicIds, filters.status, filters.difficulties]);
+
+  useEffect(() => {
+    if (!examId) return;
+    setLoadedExam('');
+    setTree(null);
+    setCatalog(null);
+    setLoadError(false);
+    let saved: Partial<Filters> | null = null;
+    try {
+      const raw = localStorage.getItem(`qbank-session-builder:${examId}`);
+      saved = raw ? JSON.parse(raw) as Partial<Filters> : null;
+    } catch { saved = null; }
+    const defaults = emptyFilters();
+    setFilters({
+      ...defaults,
+      ...(saved && Array.isArray(saved.sourceIds) && Array.isArray(saved.fullSubjects) && Array.isArray(saved.topicIds) && Array.isArray(saved.difficulties) ? saved : {}),
+      mode: fullExam ? 'exam' : saved?.mode === 'exam' ? 'exam' : 'practice',
+      status: saved?.status && ['all', 'unanswered', 'incorrect', 'saved', 'notes'].includes(saved.status) ? saved.status : filters.status,
+      questionCount: typeof saved?.questionCount === 'number' ? saved.questionCount : filters.questionCount,
+    } as Filters);
+    setLoadedExam(examId);
+  // Preferences are intentionally restored only when the selected exam changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId, fullExam, defaultStatus]);
+
+  useEffect(() => {
+    if (!examId || loadedExam !== examId) return;
+    try { localStorage.setItem(`qbank-session-builder:${examId}`, JSON.stringify(filters)); } catch { /* Storage can be disabled by the browser. */ }
+  }, [examId, filters, loadedExam]);
+
+  useEffect(() => {
+    if (!examId || loadedExam !== examId) return;
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError(false);
+    Promise.all([
+      fetch('/api/qbank/builder/tree', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(treePayload), signal: controller.signal, cache: 'no-store' }).then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<Tree>; }),
+      fetch(`/api/qbank/catalog?examId=${encodeURIComponent(examId)}`, { signal: controller.signal, cache: 'no-store' }).then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<Catalog>; }),
+    ]).then(([nextTree, nextCatalog]) => {
+      setTree(nextTree);
+      setCatalog(nextCatalog);
+      setFilters(current => current.questionCount > nextTree.available && nextTree.available > 0 ? { ...current, questionCount: nextTree.available } : current);
+    }).catch(error => {
+      if (error?.name !== 'AbortError') setLoadError(true);
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [examId, loadedExam, treePayload]);
+
+  const update = (change: Partial<Filters>) => { setMessage(''); setFilters(current => ({ ...current, ...change })); };
+  const sourceLeaves = (source: Source) => source.children.length ? source.children.map(child => child.id) : [source.id];
+  const isSourceSelected = (source: Source, parent?: Source) => filters.allSources || filters.sourceIds.includes(source.id) || Boolean(parent && filters.sourceIds.includes(parent.id));
+  const toggleParentSource = (source: Source) => {
+    if (filters.allSources) {
+      const ids = (tree?.sources ?? []).filter(row => row.id !== source.id).map(row => row.id);
+      update({ allSources: false, sourceIds: ids });
+      return;
+    }
+    const ids = [...filters.sourceIds];
+    const descendants = sourceLeaves(source);
+    if (ids.includes(source.id) || descendants.every(id => ids.includes(id))) {
+      update({ sourceIds: ids.filter(id => id !== source.id && !descendants.includes(id)) });
+    } else {
+      update({ sourceIds: [...ids.filter(id => !descendants.includes(id)), source.id] });
+    }
+  };
+  const toggleChildSource = (parent: Source, child: Source) => {
+    let ids = [...filters.sourceIds];
+    if (filters.allSources) {
+      ids = (tree?.sources ?? []).map(row => row.id).filter(id => id !== parent.id);
+      ids.push(...sourceLeaves(parent).filter(id => id !== child.id));
+      update({ allSources: false, sourceIds: ids });
+      return;
+    }
+    if (ids.includes(parent.id)) ids = [...ids.filter(id => id !== parent.id), ...sourceLeaves(parent)];
+    update({ sourceIds: ids.includes(child.id) ? ids.filter(id => id !== child.id) : [...ids, child.id] });
+  };
+  const toggleDiscipline = (discipline: Discipline) => {
+    const next = toggleDisciplineSelection({ all: filters.allDisciplines, subjects: filters.fullSubjects, topicIds: filters.topicIds }, discipline.value, tree?.disciplines ?? []);
+    update({ allDisciplines: next.all, fullSubjects: next.subjects, topicIds: next.topicIds });
+  };
+  const toggleTopic = (discipline: Discipline, topic: Topic) => {
+    if (topic.isOthers || topic.count === 0) return;
+    const next = toggleTopicSelection({ all: filters.allDisciplines, subjects: filters.fullSubjects, topicIds: filters.topicIds }, discipline.value, topic.id, tree?.disciplines ?? []);
+    update({ allDisciplines: next.all, fullSubjects: next.subjects, topicIds: next.topicIds });
+  };
+  const disciplineChecked = (discipline: Discipline) => getDisciplineSelectionState({ all: filters.allDisciplines, subjects: filters.fullSubjects, topicIds: filters.topicIds }, discipline).checked;
+  const disciplinePartial = (discipline: Discipline) => getDisciplineSelectionState({ all: filters.allDisciplines, subjects: filters.fullSubjects, topicIds: filters.topicIds }, discipline).partial;
+  const topicChecked = (discipline: Discipline, topic: Topic) => filters.allDisciplines || filters.fullSubjects.includes(discipline.value) || filters.topicIds.includes(topic.id);
+  const filteredDisciplines = useMemo(() => {
+    const query = topicSearch.trim().toLocaleLowerCase();
+    if (!query) return tree?.disciplines ?? [];
+    return (tree?.disciplines ?? []).map(d => ({ ...d, topics: d.topics.filter(topic => topic.name.toLocaleLowerCase().includes(query)) })).filter(d => d.label.toLocaleLowerCase().includes(query) || d.topics.length > 0);
+  }, [tree, topicSearch]);
+  useEffect(() => {
+    if (topicSearch.trim()) setExpandedDisciplines(current => [...new Set([...current, ...filteredDisciplines.map(d => d.value)])]);
+  }, [topicSearch, filteredDisciplines]);
+  const statusLabel = { all: t.allStatus, unanswered: t.unanswered, incorrect: t.incorrect, saved: t.saved, notes: t.notes }[filters.status];
+  const sourceSummary = filters.allSources ? t.allSources : `${filters.sourceIds.length} ${t.selected}`;
+  const disciplineSummary = filters.allDisciplines ? t.allDisciplines : `${filters.fullSubjects.length + filters.topicIds.length} ${t.selected}`;
+  const estimatedMinutes = catalog ? Math.max(1, Math.ceil(effectiveCount / Math.max(1, catalog.exam.block_max_items)) * catalog.exam.block_duration_minutes) : 0;
+
+  async function startSession() {
+    setMessage('');
+    if (!examId || !tree || available < 1) return;
+    if (effectiveCount > available) { setMessage(t.insufficient); return; }
+    setBusy(true);
+    try {
+      const response = await fetch('/api/qbank/builder/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        examId, allSources: filters.allSources, sourceIds: filters.sourceIds,
+        allDisciplines: filters.allDisciplines, fullSubjects: filters.fullSubjects,
+        topicIds: filters.topicIds, otherSubjects: [], status: filters.status,
+        difficulties: filters.difficulties, questionCount: effectiveCount, mode: filters.mode,
+      }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setMessage(body.error === 'insufficient_questions' ? t.insufficient : body.error === 'exam_question_limit' ? t.examLimit : body.error === 'account_inactive' ? m.settings.accountSuspended : t.startError);
+        return;
+      }
+      router.push(`/qbank/session/${body.sessionId}`);
+    } catch { setMessage(t.startError); }
+    finally { setBusy(false); }
+  }
+
+  function reset() {
+    setFilters(emptyFilters());
+    setTopicSearch('');
+    setExpandedSources([]);
+    setExpandedDisciplines([]);
+    setMessage('');
+    try { localStorage.removeItem(`qbank-session-builder:${examId}`); } catch { /* Storage can be disabled by the browser. */ }
+  }
+
+  const section = (id: string, title: string, summary: string, content: ReactNode) => <section className={`qbank-builder-section card ${openPanel === id ? 'is-open' : ''}`} key={id}>
+    <button type="button" className="qbank-builder-trigger" aria-expanded={openPanel === id} onClick={() => setOpenPanel(current => current === id ? null : id)}>
+      <span className="qbank-builder-trigger-copy"><strong>{title}</strong><small>{summary}</small></span>
+      <Icon name="chevron-right" size={18} />
+    </button>
+    {openPanel === id && <div className="qbank-builder-panel">{content}</div>}
+  </section>;
+
+  return <div className="qbank-session-builder">
+    {section('exam', t.exam, exams.find(exam => exam.id === examId)?.name ?? t.chooseExam, <label className="qbank-builder-field"><span>{t.chooseExam}</span><select value={examId} onChange={event => { setExamId(event.target.value); setOpenPanel(null); }}>
+      {exams.map(exam => <option key={exam.id} value={exam.id}>{exam.code} — {exam.name}</option>)}
+    </select></label>)}
+    {section('basic', t.basic, `${filters.mode === 'practice' ? t.practice : t.examMode} · ${t.questionCount}: ${effectiveCount}`, <div className="qbank-basic-panel">
+      <div className="qbank-setting"><span className="qbank-setting-label">{t.mode}</span><div className="qbank-segmented" role="group" aria-label={t.mode}>
+        <button type="button" className={filters.mode === 'practice' ? 'active' : ''} aria-pressed={filters.mode === 'practice'} onClick={() => update({ mode: 'practice' })}>{t.practice}</button>
+        <button type="button" className={filters.mode === 'exam' ? 'active' : ''} aria-pressed={filters.mode === 'exam'} onClick={() => update({ mode: 'exam' })}>{t.examMode}</button>
+      </div></div>
+    </div>)}
+    {section('source', t.source, sourceSummary, <div className="qbank-tree-list">
+      <label className="qbank-choice qbank-select-all"><input type="checkbox" checked={filters.allSources} onChange={event => update({ allSources: event.target.checked, sourceIds: [] })} /><span>{t.allSources}</span><small>{tree?.available ?? 0}</small></label>
+      {loading && <div className="qbank-filter-state" role="status">{t.loading}</div>}
+      {!loading && !tree?.sources.length && <div className="qbank-filter-state">{t.noSources}</div>}
+      {(tree?.sources ?? []).map(source => <div className="qbank-source-group" key={source.id}>
+        <div className="qbank-tree-row">
+          <label className="qbank-choice"><input type="checkbox" checked={isSourceSelected(source)} onChange={() => toggleParentSource(source)} /><span>{source.name}</span><small>{source.count}</small></label>
+          {source.children.length > 0 && <button className="qbank-expand-button" type="button" aria-expanded={expandedSources.includes(source.id)} aria-label={`${expandedSources.includes(source.id) ? t.collapse : t.expand} ${source.name}`} onClick={() => setExpandedSources(current => current.includes(source.id) ? current.filter(id => id !== source.id) : [...current, source.id])}>{expandedSources.includes(source.id) ? '−' : '+'}</button>}
+        </div>
+        {expandedSources.includes(source.id) && source.children.length > 0 && <div className="qbank-tree-children">{source.children.map(child => <label className="qbank-choice" key={child.id}><input type="checkbox" checked={isSourceSelected(child, source)} onChange={() => toggleChildSource(source, child)} /><span>{child.name}</span><small>{child.count}</small></label>)}</div>}
+      </div>)}
+      {loadError && <div className="qbank-filter-state error" role="alert">{t.loadError}</div>}
+    </div>)}
+    {section('disciplines', t.disciplines, disciplineSummary, <div className="qbank-tree-list">
+      <div className="qbank-tree-actions"><label className="qbank-choice qbank-select-all"><input type="checkbox" checked={filters.allDisciplines} onChange={event => update({ allDisciplines: event.target.checked, fullSubjects: [], topicIds: [] })} /><span>{t.allDisciplines}</span></label><button type="button" onClick={() => update({ allDisciplines: false, fullSubjects: [], topicIds: [] })}>{t.none}</button></div>
+      <label className="qbank-topic-search"><span className="sr-only">{t.search}</span><input type="search" value={topicSearch} onChange={event => setTopicSearch(event.target.value)} placeholder={t.search} /></label>
+      {loading && <div className="qbank-filter-state" role="status">{t.loading}</div>}
+      {!loading && !filteredDisciplines.length && <div className="qbank-filter-state">{t.noDisciplines}</div>}
+      {filteredDisciplines.map(discipline => <div className="qbank-source-group" key={discipline.value}>
+        <div className="qbank-tree-row">
+          <label className="qbank-choice"><input type="checkbox" checked={disciplineChecked(discipline)} aria-checked={disciplinePartial(discipline) ? 'mixed' : disciplineChecked(discipline)} onChange={() => toggleDiscipline(discipline)} /><span>{discipline.label}</span><small>{discipline.count}</small></label>
+          {discipline.topics.length > 0 && <button className="qbank-expand-button" type="button" aria-expanded={expandedDisciplines.includes(discipline.value)} aria-label={`${expandedDisciplines.includes(discipline.value) ? t.collapse : t.expand} ${discipline.label}`} onClick={() => setExpandedDisciplines(current => current.includes(discipline.value) ? current.filter(value => value !== discipline.value) : [...current, discipline.value])}>{expandedDisciplines.includes(discipline.value) ? '−' : '+'}</button>}
+        </div>
+        {expandedDisciplines.includes(discipline.value) && discipline.topics.length > 0 && <div className="qbank-tree-children">{discipline.topics.filter(topic => !topicSearch || topic.name.toLocaleLowerCase().includes(topicSearch.toLocaleLowerCase()) || discipline.label.toLocaleLowerCase().includes(topicSearch.toLocaleLowerCase())).map(topic => <label className={`qbank-choice ${topic.count === 0 ? 'is-empty' : ''}`} key={topic.id} title={topic.isOthers ? t.allDisciplines : undefined}>
+          <input type="checkbox" checked={topicChecked(discipline, topic)} disabled={topic.isOthers || topic.count === 0} onChange={() => toggleTopic(discipline, topic)} />
+          <span>{topic.name}</span><small>{topic.count}</small>
+        </label>)}</div>}
+      </div>)}
+      {loadError && <div className="qbank-filter-state error" role="alert">{t.loadError}</div>}
+    </div>)}
+    {section('advanced', t.advanced, `${statusLabel}${filters.difficulties.length ? ` · ${filters.difficulties.length} ${t.selected}` : ''}`, <div className="qbank-advanced-panel">
+      <fieldset className="qbank-setting"><legend className="qbank-setting-label">{t.status}</legend><div className="qbank-chip-options">{(['all', 'unanswered', 'incorrect', 'saved', 'notes'] as Status[]).map(status => <button type="button" key={status} className={filters.status === status ? 'active' : ''} aria-pressed={filters.status === status} onClick={() => update({ status })}>{({ all: t.allStatus, unanswered: t.unanswered, incorrect: t.incorrect, saved: t.saved, notes: t.notes })[status]}</button>)}</div></fieldset>
+      <fieldset className="qbank-setting"><legend className="qbank-setting-label">{t.difficulty}</legend><div className="qbank-chip-options">{([{ values: [1, 2], label: t.easy }, { values: [3], label: t.medium }, { values: [4, 5], label: t.hard }] as const).map(item => { const selected = item.values.every(value => filters.difficulties.includes(value)); return <button type="button" key={item.label} className={selected ? 'active' : ''} aria-pressed={selected} onClick={() => update({ difficulties: selected ? filters.difficulties.filter(value => !item.values.includes(value as never)) : [...new Set([...filters.difficulties, ...item.values])] })}>{item.label}</button>; })}</div><small className="qbank-field-note">{t.minQuestion}</small></fieldset>
+      <button type="button" className="btn qbank-reset" onClick={reset}>{t.reset}</button>
+    </div>)}
+    {loadError && <div className="form-message error" role="alert">{t.loadError}</div>}
+    {message && <div className="form-message error" role="alert">{message}</div>}
+    {!loading && tree && available === 0 && <div className="qbank-empty-state" role="status">{t.noQuestions}</div>}
+    <div className="qbank-sticky-footer">
+      <div className="qbank-available"><span>{t.available}</span><strong>{loading ? '—' : available}</strong></div>
+      <label className="qbank-count-control"><span>{t.questionCount}</span><input type="number" min={1} max={Math.min(maxCount, available || maxCount)} value={effectiveCount} disabled={available === 0 || loading} onChange={event => update({ questionCount: Math.max(1, Math.min(Math.min(maxCount, available || maxCount), Number(event.target.value) || 1)) })} /></label>
+      {filters.mode === 'exam' && <span className="qbank-time-estimate">{catalog?.exam.timing_verified && effectiveCount >= (catalog.exam.official_max_items ?? catalog.exam.max_items ?? Number.MAX_SAFE_INTEGER) ? `${catalog.exam.total_duration_minutes} ${t.min}` : `${t.timer}: ${estimatedMinutes} ${t.min}`}</span>}
+      {filters.mode === 'practice' && <span className="qbank-time-estimate">{t.untimed}</span>}
+      <button type="button" className="btn btn-primary qbank-start-button" disabled={busy || loading || loadError || available === 0 || effectiveCount > available} onClick={() => void startSession()}>{busy ? t.loading : t.start}</button>
+    </div>
+  </div>;
 }
