@@ -8,13 +8,13 @@ Set the production variables in `ENVIRONMENT.md` before build and runtime. Produ
 
 ## Supabase release sequence
 
-1. The MDvoro Platform project (`yqadaomiudllzujngbba`) currently has all 45 migrations applied. Use a separate disposable staging project for future schema changes.
-2. Live SQL/RLS contracts and disposable student/admin isolation, privilege-escalation, flashcard, study-plan, leaderboard privacy, and concurrent-idempotency checks have passed against the current project. Review Auth redirect URLs, MFA, email verification, CAPTCHA, SMTP, backup/PITR, and rate limits in Supabase settings before launch.
+1. The latest recorded live migration history ends at `0045_restore_admin_mfa_gate`. The repository contains additional migrations through version `0052`; several later SQL changes were applied manually and are not recorded in the remote migration history. **Do not run `supabase db push` against production until the live schema has been compared with every unrecorded migration and the already-applied versions have been reconciled with `supabase migration repair`.** Use a disposable staging project for this reconciliation first.
+2. Live SQL/RLS contracts and disposable student/admin isolation, privilege-escalation, flashcard, study-plan, leaderboard privacy, and concurrent-idempotency checks passed in earlier verification. Re-run them against staging after migration-history reconciliation. Review Auth redirect URLs, MFA, email verification, CAPTCHA, SMTP, backup/PITR, and rate limits in Supabase settings before launch.
 3. Configure the auth callback URL at `/auth/callback` and restrict redirect URLs to the production origin.
 4. Provision the initial administrator with the trusted CLI only, then enable MFA before granting production access.
 5. Verify deployed CSP and security headers, signup CAPTCHA, state-changing same-origin behavior, health/readiness responses and account lifecycle flows.
 
-Production hosting, domain, production environment values, and external Auth/service settings have not been configured. Treat those as release gates; see `PRODUCTION_READINESS.md` for the current evidence.
+The application is deployed to Netlify at `https://mdvoro-platform.netlify.app` and `https://mdvoro.com`. The deployment and application health endpoints were verified during the 2026-10-23 audit. Custom SMTP delivery, backup/PITR recovery, migration-history reconciliation, independent header/security review, and hosted workload capacity remain release gates; see `PRODUCTION_READINESS.md` for evidence and dates.
 
 ## Health endpoints
 
@@ -23,4 +23,4 @@ Production hosting, domain, production environment values, and external Auth/ser
 
 ## Rollback
 
-Use the hosting provider's previous immutable application release and the Supabase backup/PITR process configured for the project. Review migration reversibility before deployment; this repository does not provide an automated rollback migration for all 45 schema changes.
+Use the hosting provider's previous immutable application release. The current Supabase backup/PITR configuration and a successful restore have not been verified. Review migration reversibility before deployment; this repository does not provide automated rollback migrations for the full schema history.

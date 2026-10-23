@@ -5,8 +5,17 @@ const root = process.cwd();
 const migrationsDir = join(root, 'supabase', 'migrations');
 const sqlFiles = readdirSync(migrationsDir).filter((name) => name.endsWith('.sql')).sort();
 const failures = [];
+const migrationVersions = new Map();
 let dollarBlocks = 0;
 for (const name of sqlFiles) {
+  const version = name.match(/^(\d+)_/i)?.[1];
+  if (!version) {
+    failures.push(`${name}: migration filename must start with a numeric version and underscore`);
+  } else if (migrationVersions.has(version)) {
+    failures.push(`${name}: duplicate migration version ${version} also used by ${migrationVersions.get(version)}`);
+  } else {
+    migrationVersions.set(version, name);
+  }
   const text = readFileSync(join(migrationsDir, name), 'utf8');
   const dollars = (text.match(/\$\$/g) ?? []).length;
   dollarBlocks += dollars / 2;

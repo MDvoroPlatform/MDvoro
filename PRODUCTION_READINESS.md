@@ -1,8 +1,20 @@
 # Production readiness evidence
 
-Status reflects database checks completed on 2026-10-08, application/load checks completed on 2026-10-09, and the first production Netlify deploy on 2026-10-09 against the checked-out source and Supabase project `yqadaomiudllzujngbba` (MDvoro Platform). It is evidence-based and does not claim complete security.
+This document combines historical evidence with the latest review. Database checks and the initial production deployment are from 2026-10-08/09; later application releases are recorded below. The current code-level audit is dated 2026-10-23. It is evidence-based and does not claim complete security.
 
 The newest admin authoring release and checks are recorded in [Latest admin question authoring release (2026-10-20)](#latest-admin-question-authoring-release-2026-10-20). That section supersedes older dashboard/editor/deployment details below where they differ.
+
+## Current code-level audit and remediation (2026-10-23)
+
+- The source tree contains 44 app pages, 54 API route handlers, 5 unit-test files, and 3 Playwright spec files. The latest local browser run used CI-only placeholder settings and an isolated Supabase Auth mock: 15 tests passed and 7 were skipped. These tests do not authenticate as a student or administrator and do not exercise every product workflow.
+- The immutable Netlify deployment's `/api/health/live` and `/api/health/ready` both returned `ok: true` in the browser during this audit. This confirms those health checks at that time; it does not prove every route or the custom domain is healthy.
+- The source had duplicate migration version prefixes (`0044`, `0047`, and `0048`). The conflicting newer files were assigned unique versions `0050`–`0052`, and `scripts/check-sql-structure.mjs` now rejects duplicate or malformed migration versions. No live SQL or migration-history records were changed by this remediation.
+- After the migration rename and documentation updates, `npm run verify` passed in an isolated checkout using the committed lockfile and CI placeholder configuration: all static gates, production dependency audit (0 vulnerabilities), ESLint, TypeScript, 10/10 unit tests, and the production build (63 pages). Playwright then passed 15 tests and skipped 7 configured cases. The unit runner prints a non-failing Vite configuration warning; the enterprise style check also reports existing long-line warnings.
+- The repository contains 52 migration files through `0052`, while the latest recorded live migration history inspected in the earlier database review ended at `0045`. Later SQL was applied manually. Before any production `db push`, compare each unrecorded migration with the live schema and reconcile only confirmed-applied versions using Supabase's migration-repair procedure. Do not invent migration-history rows or blindly replay these SQL files.
+- The primary local checkout's `node_modules` is a junction to a different directory and caused its direct Next.js build to fail with a Turbopack symlink error. The successful verification used a separate isolated copy with dependencies installed from this repository's lockfile; it did not alter the junction target.
+- `DEPLOYMENT.md` previously contradicted the live state by saying hosting and the domain were not configured. It now records the deployed Netlify endpoints and the remaining verification gates.
+- The review did not read or alter question-bank content or production data. Browser tests use local fake credentials and do not write to Supabase.
+- Release blockers still include verified SMTP delivery for signup/recovery, reconciliation of migration history, a tested backup restore, production administrator/operator setup, an independent deployed-security review, and representative hosted workload testing. These depend on external service configuration, operator details, or live-system evidence and cannot be completed by changing application source alone.
 
 ## Previous work and current baseline
 
