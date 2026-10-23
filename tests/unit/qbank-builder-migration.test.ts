@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const migration = readFileSync(new URL('../../supabase/migrations/0055_qbank_session_builder.sql', import.meta.url), 'utf8');
 const topicsAsOptionsMigration = readFileSync(new URL('../../supabase/migrations/0056_qbank_topics_as_options.sql', import.meta.url), 'utf8');
+const filterTreeFix = readFileSync(new URL('../../supabase/migrations/0057_fix_qbank_filter_tree_counts.sql', import.meta.url), 'utf8');
 
 describe('QBank builder migration contract', () => {
   it('is additive and safe to rerun', () => {
@@ -36,5 +37,10 @@ describe('QBank builder migration contract', () => {
   it('makes Others selectable and recognizes the existing OB/GYN subject spelling', () => {
     expect(topicsAsOptionsMigration).toMatch(/t.name='Others' and not exists/i);
     expect(topicsAsOptionsMigration).toMatch(/obstetrics and gynecology/i);
+  });
+
+  it('uses the topic count CTE instead of an undefined alias', () => {
+    expect(filterTreeFix).toMatch(/select n from topic_counts where id=t\.id/i);
+    expect(filterTreeFix).not.toMatch(/coalesce\(tc\.n,0\)/i);
   });
 });
