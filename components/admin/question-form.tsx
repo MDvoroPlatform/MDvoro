@@ -14,6 +14,14 @@ type Taxonomy = {
     slug: string;
     child_count: number;
 };
+type QBankTaxonomyNode = {
+    id: string;
+    parent_id: string | null;
+    node_type: string;
+    name: string;
+    aliases: string[];
+    qbank_seeded: boolean;
+};
 type Media = {
     id: string;
     kind: string;
@@ -48,10 +56,11 @@ type Initial = {
     rightsBasis?: 'original' | 'licensed' | 'permission' | 'public_domain' | 'user_submitted' | 'unknown';
 };
 const emptyOptions = ['A', 'B', 'C', 'D', 'E'].map((id) => ({ id, text: '' }));
-export function QuestionForm({ exams, media, initial, canReview, canEdit = true, canPublishDirect = false, taxonomy = [], selectedTaxonomyIds = [], }: {
+export function QuestionForm({ exams, media, initial, canReview, canEdit = true, canPublishDirect = false, taxonomy = [], qbankTaxonomy = [], selectedTaxonomyIds = [], }: {
     exams: Exam[];
     media: Media[];
     taxonomy?: Taxonomy[];
+    qbankTaxonomy?: QBankTaxonomyNode[];
     selectedTaxonomyIds?: string[];
     initial?: Initial;
     canReview?: boolean;
@@ -66,6 +75,24 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
     const [busy, setBusy] = useState(false);
     const [selectedTaxonomy, setSelectedTaxonomy] = useState<string[]>(selectedTaxonomyIds);
     const [message, setMessage] = useState('');
+    const qbankSubjects = qbankTaxonomy.filter((node) => node.node_type === 'subject');
+    const qbankTopics = qbankTaxonomy.filter((node) => node.node_type === 'topic' && node.qbank_seeded);
+    const normalize = (value: string) => value.trim().toLocaleLowerCase();
+    const subjectNode = qbankSubjects.find((node) => [node.name, ...node.aliases].some((name) => normalize(name) === normalize(form.subject)));
+    const subjectChoice = subjectNode?.id ?? '__custom__';
+    const topicsForSubject = subjectNode ? qbankTopics.filter((node) => node.parent_id === subjectNode.id) : [];
+    const selectedTopicNode = topicsForSubject.find((node) => [node.name, ...node.aliases].some((name) => normalize(name) === normalize(form.topic)));
+    const topicChoice = selectedTopicNode?.id ?? (form.topic ? '__custom__' : '');
+    function changeSubject(value: string) {
+        const next = qbankSubjects.find((node) => node.id === value);
+        update({ subject: next?.name ?? (value === '__custom__' ? '' : form.subject), topic: '' });
+        setSelectedTaxonomy((current) => current.filter((id) => !qbankTopics.some((node) => node.id === id)));
+    }
+    function changeTopic(value: string) {
+        const next = topicsForSubject.find((node) => node.id === value);
+        update({ topic: next?.name ?? (value === '__custom__' ? '' : form.topic) });
+        setSelectedTaxonomy((current) => [...current.filter((id) => !qbankTopics.some((node) => node.id === id)), ...(next ? [next.id] : [])]);
+    }
     function update(patch: Partial<Initial>) { setForm((value) => ({ ...value, ...patch })); }
     function updateOption(id: string, text: string) { update({ options: form.options.map((option) => option.id === id ? { ...option, text } : option) }); }
     function addOption() {
@@ -113,7 +140,9 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
         let relatedUpdatesSucceeded = true;
         if (body.id || form.id) {
             const questionId = savedQuestionId;
-            const taxonomyResponse = await fetch('/api/admin/questions/taxonomy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId, taxonomyIds: selectedTaxonomy }) });
+            const linkedTopicId = topicsForSubject.find((node) => [node.name, ...node.aliases].some((name) => normalize(name) === normalize(form.topic)))?.id;
+            const taxonomyIds = [...new Set([...selectedTaxonomy.filter((id) => !qbankTopics.some((node) => node.id === id)), ...(linkedTopicId ? [linkedTopicId] : [])])];
+            const taxonomyResponse = await fetch('/api/admin/questions/taxonomy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId, taxonomyIds }) });
             if (!taxonomyResponse.ok) {
                 relatedUpdatesSucceeded = false;
                 setMessage('Draft saved, but taxonomy could not be updated.');
@@ -220,8 +249,8 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
         <div className="section-title">Question information</div>
         <div className="form-grid-2">
           <label className="field"><span>Exam <b className="required-mark">Required</b></span><select data-question-field="exam" required disabled={!canEdit} value={form.examId} onChange={(e) => update({ examId: e.target.value })}>{exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.code} — {exam.name}</option>)}</select></label>
-          <label className="field"><span>Subject <b className="required-mark">Required</b></span><input data-question-field="subject" required disabled={!canEdit} value={form.subject} onChange={(e) => update({ subject: e.target.value })} placeholder="Internal Medicine"/></label>
-          <label className="field"><span>Topic</span><input disabled={!canEdit} value={form.topic} onChange={(e) => update({ topic: e.target.value })} placeholder="Cardiology / Arrhythmias"/></label><label className="field"><span>Recall key terms</span><input disabled={!canEdit} value={(form.keyTerms??[]).join(', ')} onChange={(e) => update({ keyTerms: e.target.value.split(',').map((v) => v.trim()).filter(Boolean).slice(0,3) })} placeholder="Hyperkalemia, peaked T waves, ECG"/><small className="field-note">Up to 3 short recall cues shown after answering.</small></label>
+          <label className="field"><span>Subject <b className="required-mark">Required</b></span>{qbankSubjects.length ? <select data-question-field="subject" required disabled={!canEdit} value={subjectChoice} onChange={(e) => changeSubject(e.target.value)}><option value="" disabled>Choose a subject</option>{qbankSubjects.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}<option value="__custom__">Other subject…</option></select> : null}{(!qbankSubjects.length || subjectChoice === '__custom__') && <input data-question-field="subject" required disabled={!canEdit} value={form.subject} onChange={(e) => update({ subject: e.target.value })} placeholder="Enter subject"/>}<small className="field-note">Choose a QBank subject so the question appears under the matching discipline.</small></label>
+          <label className="field"><span>Topic</span>{topicsForSubject.length ? <select disabled={!canEdit} value={topicChoice} onChange={(e) => changeTopic(e.target.value)}><option value="">Choose a topic</option>{topicsForSubject.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}<option value="__custom__">Other topic…</option></select> : null}{(!topicsForSubject.length || topicChoice === '__custom__') && <input disabled={!canEdit} value={form.topic} onChange={(e) => update({ topic: e.target.value })} placeholder="Enter topic"/>}{topicsForSubject.length > 0 && <small className="field-note">Topics are loaded from the matching QBank discipline.</small>}</label><label className="field"><span>Recall key terms</span><input disabled={!canEdit} value={(form.keyTerms??[]).join(', ')} onChange={(e) => update({ keyTerms: e.target.value.split(',').map((v) => v.trim()).filter(Boolean).slice(0,3) })} placeholder="Hyperkalemia, peaked T waves, ECG"/><small className="field-note">Up to 3 short recall cues shown after answering.</small></label>
           <label className="field"><span>Difficulty</span><select disabled={!canEdit} value={form.difficulty ?? 3} onChange={(e) => update({ difficulty: Number(e.target.value) })}>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></label>
           <label className="field"><span>Source / reference</span><input disabled={!canEdit} value={form.sourceReference ?? ''} onChange={(e) => update({ sourceReference: e.target.value })} placeholder="Textbook, chapter, paper, or source URL"/></label>
           <label className="field"><span>Content rights basis</span><select disabled={!canEdit} value={form.rightsBasis ?? 'unknown'} onChange={(e) => update({ rightsBasis: e.target.value as Initial['rightsBasis'] })}><option value="unknown">Not yet confirmed</option><option value="original">Original content</option><option value="licensed">Licensed</option><option value="permission">Permission granted</option><option value="public_domain">Public domain</option><option value="user_submitted">User submitted</option></select><small className="field-note">This records the declared basis only; it does not verify the source or grant publishing permission.</small></label>
