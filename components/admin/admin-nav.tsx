@@ -16,6 +16,8 @@ const items: readonly NavItem[] = [
     { href: '/admin/questions', label: 'Questions', icon: 'book' },
     { href: '/admin/questions/new', label: 'New question', icon: 'plus' },
     { href: '/admin/review', label: 'Review queue', icon: 'check', reviewerOnly: true },
+    { href: '/admin/qbank-reports', label: 'Question reports', icon: 'mail', reviewerOnly: true },
+    { href: '/admin/lab-values', label: 'Lab values', icon: 'chart', reviewerOnly: true },
     { href: '/admin/media', label: 'Media library', icon: 'cards' },
     { href: '/admin/import', label: 'Import', icon: 'arrow' },
     { href: '/admin/taxonomy', label: 'Taxonomy', icon: 'grid' },

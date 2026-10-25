@@ -48,7 +48,7 @@ export function noStoreJson(body: unknown, init?: ResponseInit) {
         headers: { 'Cache-Control': 'private, no-store', 'X-Request-ID': id, ...(init?.headers ?? {}) },
     });
 }
-export async function enforceRateLimit(supabase: Awaited<ReturnType<typeof createClient>>, action: 'qbank_answer' | 'qbank_next' | 'qbank_catalog' | 'qbank_break' | 'flashcard_review' | 'flashcard_delete' | 'admin_write' | 'admin_upload' | 'auth_mutation', limit: number, windowSeconds: number) {
+export async function enforceRateLimit(supabase: Awaited<ReturnType<typeof createClient>>, action: 'qbank_answer' | 'qbank_next' | 'qbank_catalog' | 'qbank_break' | 'qbank_annotation' | 'qbank_feedback' | 'flashcard_review' | 'flashcard_delete' | 'admin_write' | 'admin_upload' | 'auth_mutation', limit: number, windowSeconds: number) {
     const { data, error } = await supabase.rpc('consume_rate_limit', { p_action: action, p_limit: limit, p_window_seconds: windowSeconds });
     if (error || data !== true)
         throw new RateLimitError();

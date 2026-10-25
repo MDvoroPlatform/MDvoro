@@ -1,10 +1,12 @@
 'use client';
 import Image from 'next/image';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type SyntheticEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n/provider';
+import { AnnotationText, type QuestionAnnotation } from '@/components/qbank/annotation-text';
+import { createTextAnchor, type AnnotationAnchor } from '@/lib/qbank/annotation-anchor';
 
 type SessionItem = {
   position: number;
@@ -56,6 +58,7 @@ type SessionState = {
     break_seconds_used: number;
     break_remaining_seconds: number;
     break_started_at: string | null;
+    practice_paused_seconds: number;
     on_break: boolean;
   };
   question: Question | null;
@@ -64,6 +67,7 @@ type SessionState = {
 
 type ApiErrorBody = { error?: string };
 type AnswerResponse = { already_answered?: boolean; is_correct?: boolean; selected_answer?: string | null; error?: string };
+type IssueCategory = 'incorrect_answer' | 'typo' | 'unclear' | 'outdated' | 'other';
 
 function formatTime(totalSeconds: number): string {
   const safe = Math.max(0, totalSeconds);
@@ -82,12 +86,13 @@ async function readJson<T>(response: Response): Promise<T> {
 
 export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const router = useRouter();
-  const { messages: m } = useI18n();
+  const { messages: m, locale } = useI18n();
   const [state, setState] = useState<SessionState | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [keyVisible, setKeyVisible] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,12 +102,31 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [questionStartedAt, setQuestionStartedAt] = useState<number>(() => Date.now());
   const [confidence, setConfidence] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [flashcardStatus, setFlashcardStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [confirmFinish, setConfirmFinish] = useState(false);
+  const [annotations, setAnnotations] = useState<QuestionAnnotation[]>([]);
+  const [pendingAnnotation, setPendingAnnotation] = useState<{ segmentKey: string; anchor: AnnotationAnchor } | null>(null);
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  const [annotationNote, setAnnotationNote] = useState('');
+  const [annotationColor, setAnnotationColor] = useState<QuestionAnnotation['color']>('yellow');
+  const [annotationBusy, setAnnotationBusy] = useState(false);
+  const [annotationError, setAnnotationError] = useState('');
+  const [questionRating, setQuestionRating] = useState<number | null>(null);
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCategory, setReportCategory] = useState<IssueCategory>('incorrect_answer');
+  const [reportMessage, setReportMessage] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const timerCopy = ({ en: { elapsed: 'Elapsed', pause: 'Pause', resume: 'Resume', paused: 'Practice paused' }, he: { elapsed: 'זמן שחלף', pause: 'השהה', resume: 'המשך', paused: 'התרגול מושהה' }, ar: { elapsed: 'الوقت المنقضي', pause: 'إيقاف مؤقت', resume: 'استئناف', paused: 'التدريب متوقف مؤقتًا' }, ru: { elapsed: 'Прошло', pause: 'Пауза', resume: 'Продолжить', paused: 'Практика приостановлена' } } as const)[locale];
 
   const currentPosition = state?.session.current_position ?? 1;
   const isLast = currentPosition >= (state?.session.requested_count ?? 0);
   const isExam = state?.session.mode === 'exam';
   const hasAnswered = state?.question?.answered ?? false;
   const canSeeKeyTerms = !isExam || hasAnswered;
+  const questionAnnotations = annotations.filter((annotation) => annotation.question_id === state?.question?.id);
+  const activeAnnotation = questionAnnotations.find((annotation) => annotation.id === activeAnnotationId) ?? null;
 
   const load = useCallback(async (position = 0) => {
     try {
@@ -120,6 +144,10 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       }
       const nextState = body as SessionState;
       setError(null);
+      setAnnotations([]);
+      setPendingAnnotation(null);
+      setActiveAnnotationId(null);
+      setAnnotationError('');
       setState(nextState);
       setSelected(nextState.question?.selected_answer ?? null);
       setNote(nextState.question?.note ?? '');
@@ -128,6 +156,11 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       setKeyVisible(false);
       setFlashcardStatus('idle');
       setBreakRemaining(nextState.session.break_remaining_seconds);
+      setQuestionRating(null);
+      setReportOpen(false);
+      setReportMessage('');
+      setReportSubmitted(false);
+      setFeedbackMessage('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : m.common.error);
     } finally {
@@ -141,8 +174,21 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   }, [load]);
 
   useEffect(() => {
-    if (!state?.session.time_limit_seconds) return;
+    if (!state) return;
     const started = new Date(state.session.started_at).getTime();
+    if (state.session.mode === 'practice') {
+      const tick = () => {
+        const wallElapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
+        const pausedNow = state.session.on_break && state.session.break_started_at
+          ? Math.max(0, Math.floor((Date.now() - new Date(state.session.break_started_at).getTime()) / 1000)) : 0;
+        setElapsedSeconds(Math.max(0, wallElapsed - state.session.practice_paused_seconds - pausedNow));
+      };
+      tick();
+      if (state.session.on_break) return;
+      const timer = window.setInterval(tick, 1000);
+      return () => window.clearInterval(timer);
+    }
+    if (!state.session.time_limit_seconds) return;
     const total = state.session.time_limit_seconds;
     const tick = () => {
       const wallElapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
@@ -158,7 +204,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
-  }, [state?.session]);
+  }, [state]);
 
   useEffect(() => {
     if (!state?.session.on_break) return;
@@ -300,6 +346,22 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     }
   }, [breakBusy, currentPosition, load, m.qbank.couldNotResume, sessionId, state]);
 
+  const togglePracticePause = useCallback(async () => {
+    if (!state || state.session.mode !== 'practice' || breakBusy) return;
+    setBreakBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/qbank/session/${sessionId}/timer`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: state.session.on_break ? 'resume' : 'pause' }),
+      });
+      if (!response.ok) throw new Error(timerCopy.resume);
+      await load(currentPosition);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : timerCopy.resume);
+    } finally { setBreakBusy(false); }
+  }, [breakBusy, currentPosition, load, sessionId, state, timerCopy.resume]);
+
   useEffect(() => {
     if (!state) return;
     const question = state.question;
@@ -351,6 +413,83 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     }
   }, [m.qbank.couldNotFinish, router, saving, sessionId, state]);
 
+  const confirmFinishCopy = {
+    en: 'Finish this session now? Your recorded answers and progress will be saved.',
+    ar: 'هل تريد إنهاء الجلسة الآن؟ ستُحفظ إجاباتك وتقدمك المسجل.',
+    he: 'לסיים את המפגש עכשיו? התשובות וההתקדמות שנשמרו יישארו זמינות.',
+    ru: 'Завершить сессию сейчас? Записанные ответы и прогресс будут сохранены.',
+  }[locale] ?? 'Finish this session now? Your recorded answers and progress will be saved.';
+  const annotationCopy = {
+    en: { title: 'Private highlights', help: 'Select text in the question, choices, or explanation to highlight it.', note: 'Private note for this passage', placeholder: 'Add a note about this passage…', save: 'Save highlight', saveNote: 'Save note', remove: 'Remove highlight', cancel: 'Cancel', loadError: 'Could not load private highlights.', saveError: 'Could not save this highlight.', updateError: 'Could not update this highlight.', deleteError: 'Could not remove this highlight.', colors: { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink', orange: 'Orange' } },
+    ar: { title: 'التظليلات الخاصة', help: 'حدد نصًا من السؤال أو الخيارات أو الشرح لتظليله.', note: 'ملاحظة خاصة لهذا المقطع', placeholder: 'أضف ملاحظة لهذا المقطع…', save: 'حفظ التظليل', saveNote: 'حفظ الملاحظة', remove: 'حذف التظليل', cancel: 'إلغاء', loadError: 'تعذر تحميل التظليلات الخاصة.', saveError: 'تعذر حفظ هذا التظليل.', updateError: 'تعذر تعديل هذا التظليل.', deleteError: 'تعذر حذف هذا التظليل.', colors: { yellow: 'أصفر', green: 'أخضر', blue: 'أزرق', pink: 'وردي', orange: 'برتقالي' } },
+    he: { title: 'הדגשות פרטיות', help: 'בחרו טקסט בשאלה, בתשובות או בהסבר כדי להדגיש אותו.', note: 'הערה פרטית לקטע הזה', placeholder: 'הוסיפו הערה לקטע…', save: 'שמירת הדגשה', saveNote: 'שמירת הערה', remove: 'הסרת הדגשה', cancel: 'ביטול', loadError: 'לא ניתן לטעון הדגשות פרטיות.', saveError: 'לא ניתן לשמור את ההדגשה.', updateError: 'לא ניתן לעדכן את ההדגשה.', deleteError: 'לא ניתן להסיר את ההדגשה.', colors: { yellow: 'צהוב', green: 'ירוק', blue: 'כחול', pink: 'ורוד', orange: 'כתום' } },
+    ru: { title: 'Личные выделения', help: 'Выделите текст вопроса, вариантов или объяснения.', note: 'Личная заметка к этому фрагменту', placeholder: 'Добавьте заметку к фрагменту…', save: 'Сохранить выделение', saveNote: 'Сохранить заметку', remove: 'Удалить выделение', cancel: 'Отмена', loadError: 'Не удалось загрузить личные выделения.', saveError: 'Не удалось сохранить выделение.', updateError: 'Не удалось изменить выделение.', deleteError: 'Не удалось удалить выделение.', colors: { yellow: 'Жёлтый', green: 'Зелёный', blue: 'Синий', pink: 'Розовый', orange: 'Оранжевый' } },
+  }[locale] ?? { title: 'Private highlights', help: 'Select text in the question, choices, or explanation to highlight it.', note: 'Private note for this passage', placeholder: 'Add a note about this passage…', save: 'Save highlight', saveNote: 'Save note', remove: 'Remove highlight', cancel: 'Cancel', loadError: 'Could not load private highlights.', saveError: 'Could not save this highlight.', updateError: 'Could not update this highlight.', deleteError: 'Could not remove this highlight.', colors: { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink', orange: 'Orange' } };
+  const feedbackCopy = {
+    en: { rate: 'How useful was this question?', rated: 'Thanks for rating this question.', report: 'Report a problem', reportSent: 'Report submitted. Thank you for helping improve the bank.', category: 'Problem type', message: 'Details (optional)', placeholder: 'Describe the problem briefly…', noPatient: 'Please do not include patient or personal information.', submit: 'Send report', cancel: 'Cancel', ratingError: 'Could not save your rating.', reportError: 'Could not submit your report.', categories: { incorrect_answer: 'Incorrect answer or explanation', typo: 'Typo', unclear: 'Unclear wording', outdated: 'Outdated information', other: 'Other' } },
+    ar: { rate: 'ما مدى فائدة هذا السؤال؟', rated: 'شكرًا لتقييم السؤال.', report: 'الإبلاغ عن مشكلة', reportSent: 'تم إرسال البلاغ. شكرًا لمساعدتنا في تحسين البنك.', category: 'نوع المشكلة', message: 'التفاصيل (اختياري)', placeholder: 'صف المشكلة باختصار…', noPatient: 'يرجى عدم تضمين معلومات مريض أو معلومات شخصية.', submit: 'إرسال البلاغ', cancel: 'إلغاء', ratingError: 'تعذر حفظ التقييم.', reportError: 'تعذر إرسال البلاغ.', categories: { incorrect_answer: 'إجابة أو شرح غير صحيح', typo: 'خطأ مطبعي', unclear: 'صياغة غير واضحة', outdated: 'معلومة قديمة', other: 'أخرى' } },
+    he: { rate: 'עד כמה השאלה הייתה מועילה?', rated: 'תודה על דירוג השאלה.', report: 'דיווח על בעיה', reportSent: 'הדיווח נשלח. תודה על העזרה בשיפור המאגר.', category: 'סוג הבעיה', message: 'פרטים (לא חובה)', placeholder: 'תארו את הבעיה בקצרה…', noPatient: 'אין לכלול מידע על מטופלים או מידע אישי.', submit: 'שליחת דיווח', cancel: 'ביטול', ratingError: 'לא ניתן לשמור את הדירוג.', reportError: 'לא ניתן לשלוח את הדיווח.', categories: { incorrect_answer: 'תשובה או הסבר שגויים', typo: 'שגיאת כתיב', unclear: 'ניסוח לא ברור', outdated: 'מידע לא מעודכן', other: 'אחר' } },
+    ru: { rate: 'Насколько полезен этот вопрос?', rated: 'Спасибо за оценку.', report: 'Сообщить о проблеме', reportSent: 'Сообщение отправлено. Спасибо за помощь.', category: 'Тип проблемы', message: 'Подробности (необязательно)', placeholder: 'Кратко опишите проблему…', noPatient: 'Не указывайте данные пациентов или личную информацию.', submit: 'Отправить', cancel: 'Отмена', ratingError: 'Не удалось сохранить оценку.', reportError: 'Не удалось отправить сообщение.', categories: { incorrect_answer: 'Неверный ответ или объяснение', typo: 'Опечатка', unclear: 'Непонятная формулировка', outdated: 'Устаревшая информация', other: 'Другое' } },
+  }[locale] ?? { rate: 'How useful was this question?', rated: 'Thanks for rating this question.', report: 'Report a problem', reportSent: 'Report submitted. Thank you for helping improve the bank.', category: 'Problem type', message: 'Details (optional)', placeholder: 'Describe the problem briefly…', noPatient: 'Please do not include patient or personal information.', submit: 'Send report', cancel: 'Cancel', ratingError: 'Could not save your rating.', reportError: 'Could not submit your report.', categories: { incorrect_answer: 'Incorrect answer or explanation', typo: 'Typo', unclear: 'Unclear wording', outdated: 'Outdated information', other: 'Other' } };
+
+  useEffect(() => {
+    const questionId = state?.question?.id;
+    if (!questionId) return;
+    let current = true;
+    void fetch(`/api/qbank/annotations?questionId=${encodeURIComponent(questionId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const body = await readJson<QuestionAnnotation[] | ApiErrorBody>(response);
+        if (!response.ok) throw new Error(annotationCopy.loadError);
+        if (current && Array.isArray(body)) setAnnotations(body);
+      })
+      .catch((cause) => { if (current) setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.loadError); });
+    return () => { current = false; };
+  }, [annotationCopy.loadError, state?.question?.id]);
+
+  useEffect(() => {
+    const questionId = state?.question?.id;
+    if (!questionId) return;
+    let current = true;
+    void fetch(`/api/qbank/ratings?questionId=${encodeURIComponent(questionId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const body = await readJson<{ rating: number | null }>(response);
+        if (response.ok && current) setQuestionRating(body.rating);
+      })
+      .catch(() => { /* Rating is optional; the question remains usable if it cannot load. */ });
+    return () => { current = false; };
+  }, [state?.question?.id]);
+
+  async function saveQuestionRating(value: number) {
+    if (!question || ratingBusy) return;
+    setRatingBusy(true);
+    setFeedbackMessage('');
+    try {
+      const response = await fetch('/api/qbank/ratings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ questionId: question.id, rating: value }) });
+      if (!response.ok) throw new Error(feedbackCopy.ratingError);
+      setQuestionRating(value);
+      setFeedbackMessage(feedbackCopy.rated);
+    } catch (cause) {
+      setFeedbackMessage(cause instanceof Error ? cause.message : feedbackCopy.ratingError);
+    } finally { setRatingBusy(false); }
+  }
+
+  async function submitQuestionReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!question || reportBusy) return;
+    setReportBusy(true);
+    setFeedbackMessage('');
+    try {
+      const response = await fetch('/api/qbank/reports', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ questionId: question.id, category: reportCategory, message: reportMessage }) });
+      if (!response.ok) throw new Error(feedbackCopy.reportError);
+      setReportSubmitted(true);
+      setReportOpen(false);
+      setReportMessage('');
+      setFeedbackMessage(feedbackCopy.reportSent);
+    } catch (cause) {
+      setFeedbackMessage(cause instanceof Error ? cause.message : feedbackCopy.reportError);
+    } finally { setReportBusy(false); }
+  }
+
   const media = useMemo(() => [...(state?.question?.media ?? [])].sort((a, b) => a.position - b.position), [state?.question?.media]);
 
   if (loading && !state) return <main className="page-shell"><div className="card card-pad">{m.common.loading}</div></main>;
@@ -359,9 +498,83 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const question = state.question;
 
   const currentItem = state.items.find((item) => item.position === currentPosition);
+  function captureTextSelection(event: SyntheticEvent<HTMLElement>) {
+    const eventTarget = event.target;
+    if (eventTarget instanceof Element && eventTarget.closest('.qbank-annotations,button,input,textarea,select,[role="dialog"]')) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) return;
+    const range = selection.getRangeAt(0);
+    const node = range.commonAncestorContainer;
+    const element = node instanceof Element ? node : node.parentElement;
+    const surface = element?.closest<HTMLElement>('[data-annotation-segment]');
+    if (!surface || !surface.contains(range.startContainer) || !surface.contains(range.endContainer)) return;
+    const text = surface.textContent ?? '';
+    const startRange = range.cloneRange();
+    startRange.selectNodeContents(surface);
+    startRange.setEnd(range.startContainer, range.startOffset);
+    const start = startRange.toString().length;
+    const selectedText = range.toString();
+    const anchor = createTextAnchor(text, start, start + selectedText.length);
+    if (!anchor || text.slice(start, start + selectedText.length) !== selectedText) return;
+    setActiveAnnotationId(null);
+    setAnnotationNote('');
+    setAnnotationColor('yellow');
+    setPendingAnnotation({ segmentKey: surface.dataset.annotationSegment ?? 'stem', anchor });
+    setAnnotationError('');
+  }
+
+  async function saveNewAnnotation() {
+    if (!pendingAnnotation || !question || annotationBusy) return;
+    setAnnotationBusy(true);
+    setAnnotationError('');
+    try {
+      const response = await fetch('/api/qbank/annotations', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: crypto.randomUUID(), questionId: question.id, segmentKey: pendingAnnotation.segmentKey, ...pendingAnnotation.anchor, color: annotationColor, note: annotationNote.trim() || null }),
+      });
+      const body = await readJson<QuestionAnnotation & ApiErrorBody>(response);
+      if (!response.ok) throw new Error(annotationCopy.saveError);
+      setAnnotations((current) => [...current.filter((annotation) => annotation.id !== body.id), body]);
+      setActiveAnnotationId(body.id);
+      setPendingAnnotation(null);
+      window.getSelection()?.removeAllRanges();
+    } catch (cause) {
+      setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.saveError);
+    } finally { setAnnotationBusy(false); }
+  }
+
+  async function updateActiveAnnotation(patch: { color?: QuestionAnnotation['color']; note?: string | null }) {
+    if (!activeAnnotation || annotationBusy) return;
+    setAnnotationBusy(true);
+    setAnnotationError('');
+    try {
+      const response = await fetch('/api/qbank/annotations', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: activeAnnotation.id, ...patch }) });
+      const body = await readJson<QuestionAnnotation & ApiErrorBody>(response);
+      if (!response.ok) throw new Error(annotationCopy.updateError);
+      setAnnotations((current) => current.map((annotation) => annotation.id === body.id ? body : annotation));
+      if (patch.note !== undefined) setAnnotationNote(body.note ?? '');
+    } catch (cause) {
+      setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.updateError);
+    } finally { setAnnotationBusy(false); }
+  }
+
+  async function deleteActiveAnnotation() {
+    if (!activeAnnotation || annotationBusy) return;
+    setAnnotationBusy(true);
+    setAnnotationError('');
+    try {
+      const response = await fetch('/api/qbank/annotations', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: activeAnnotation.id }) });
+      if (!response.ok) throw new Error(annotationCopy.deleteError);
+      setAnnotations((current) => current.filter((annotation) => annotation.id !== activeAnnotation.id));
+      setActiveAnnotationId(null);
+      setAnnotationNote('');
+    } catch (cause) {
+      setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.deleteError);
+    } finally { setAnnotationBusy(false); }
+  }
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" data-active-qbank-session>
       <div className="page-head">
         <div>
           <div className="eyebrow">{state.session.exam_code} · {isExam ? m.qbank.examMode : m.qbank.practiceMode}</div>
@@ -369,8 +582,9 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
           <p className="subtitle">{state.session.exam_name} · {m.qbank.blocks} {state.session.current_block}/{state.session.block_count}</p>
         </div>
         <div className="qbank-session-toolbar"><span className="qbank-shortcuts">1–9 answer · Enter submit · M mark · → next</span>
-          {remaining !== null && <span className="session-timer">{formatTime(remaining)}</span>}{isExam && blockRemaining !== null && !state.session.on_break && <span className="session-timer">{m.qbank.blockTime}: {formatTime(blockRemaining)}</span>}
-          <button className="btn btn-primary" disabled={saving} onClick={() => void finish()} type="button">{m.qbank.finishSession}</button>
+          {isExam && remaining !== null && <span className="session-timer">{formatTime(remaining)}</span>}{!isExam && <span className="session-timer">{timerCopy.elapsed}: {formatTime(elapsedSeconds)}</span>}{isExam && blockRemaining !== null && !state.session.on_break && <span className="session-timer">{m.qbank.blockTime}: {formatTime(blockRemaining)}</span>}
+          {!isExam && <button className="btn" disabled={breakBusy} onClick={() => void togglePracticePause()} type="button">{state.session.on_break ? timerCopy.resume : timerCopy.pause}</button>}
+          <button className="btn btn-primary" disabled={saving} onClick={() => setConfirmFinish(true)} type="button">{m.qbank.finishSession}</button>
         </div>
       </div>
 
@@ -380,13 +594,13 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         <div className="break-panel"><span>{m.qbank.breakAvailable} · {Math.ceil(state.session.break_remaining_seconds / 60)} min</span><button className="btn" disabled={breakBusy} onClick={() => void startBreak()} type="button">{m.qbank.takeBreak}</button></div>
       )}
       {state.session.on_break && (
-        <div className="break-panel"><div><strong>{m.qbank.onBreak}</strong><div className="panel-sub">{m.qbank.breakRemaining}: {formatTime(breakRemaining)}</div></div><button className="btn btn-primary" disabled={breakBusy || breakRemaining <= 0} onClick={() => void endBreak()} type="button">{m.qbank.resumeExam}</button></div>
+        <div className="break-panel"><div><strong>{!isExam ? timerCopy.paused : m.qbank.onBreak}</strong>{isExam && <div className="panel-sub">{m.qbank.breakRemaining}: {formatTime(breakRemaining)}</div>}</div>{isExam && <button className="btn btn-primary" disabled={breakBusy || breakRemaining <= 0} onClick={() => void endBreak()} type="button">{m.qbank.resumeExam}</button>}</div>
       )}
 
-      {!state.session.on_break && question && <section className="qbank-session-layout">
+      {!state.session.on_break && question && <section className="qbank-session-layout" onMouseUp={captureTextSelection} onTouchEnd={captureTextSelection} onKeyUp={captureTextSelection}>
         <div className="card card-pad question-card">
           <div className="question-meta"><span>{question.subject}</span>{question.topic && <span>{question.topic}</span>}{question.reconstruction?.is_reconstruction && <span className="reconstruction-badge">{question.reconstruction.label} {question.reconstruction.year ?? ''}</span>}<span>{m.qbank.difficulty} {question.difficulty ?? '—'}/5</span></div>
-          <div className="question-stem">{question.stem}</div>
+          <div className="question-stem"><AnnotationText text={question.stem} segmentKey="stem" annotations={questionAnnotations}/></div>
           {media.length > 0 && <div className="question-media">{media.map((asset) => {
             const src = asset.url || asset.external_url;
             return src ? <figure key={asset.id}><Image src={src} alt={asset.alt_text} width={1200} height={800} unoptimized loading="lazy" decoding="async" referrerPolicy="no-referrer"/><figcaption>{asset.caption}</figcaption></figure> : null;
@@ -396,7 +610,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
               const answered = question.answered;
               const correct = answered && option.id === question.correct_answer;
               const wrongSelected = answered && option.id === selected && !question.is_correct;
-              return <button key={option.id} className={`answer-option${selected === option.id ? ' selected' : ''}${correct ? ' correct' : ''}${wrongSelected ? ' incorrect' : ''}`} disabled={answered || saving} onClick={() => setSelected(option.id)} type="button"><b>{option.id}</b><span>{option.text}</span></button>;
+              return <button key={option.id} className={`answer-option${selected === option.id ? ' selected' : ''}${correct ? ' correct' : ''}${wrongSelected ? ' incorrect' : ''}`} disabled={answered || saving} onClick={() => setSelected(option.id)} type="button"><b>{option.id}</b><span><AnnotationText text={option.text} segmentKey={`option:${option.id}`} annotations={questionAnnotations}/></span></button>;
             })}
           </div>
 
@@ -411,12 +625,40 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
           ) : (
             <div className={`answer-result ${question.is_correct ? 'answer-correct' : 'answer-wrong'}`}>
               <strong>{question.is_correct ? m.qbank.correct : m.qbank.incorrect}</strong>
-              {question.explanation && <p>{question.explanation}</p>}
-              {question.key_learning_point && <div className="learning-point"><b>{m.qbank.keyLearning}</b><span>{question.key_learning_point}</span></div>}
+              {question.explanation && <p><AnnotationText text={question.explanation} segmentKey="explanation" annotations={questionAnnotations}/></p>}
+              {question.key_learning_point && <div className="learning-point"><b>{m.qbank.keyLearning}</b><span><AnnotationText text={question.key_learning_point} segmentKey="key_learning_point" annotations={questionAnnotations}/></span></div>}
             </div>
           )}
 
           <div className="question-actions qbank-session-tools">
+            <section className="qbank-annotations" aria-label="Private question highlights">
+              <div className="panel-head"><div><div className="panel-title">{annotationCopy.title}</div><div className="panel-sub">{annotationCopy.help}</div></div><span className="qbank-annotation-count">{questionAnnotations.length}</span></div>
+              {questionAnnotations.length > 0 && <div className="qbank-annotation-list">{questionAnnotations.map((annotation) => <button key={annotation.id} type="button" className={`qbank-annotation-chip annotation-${annotation.color}${activeAnnotationId === annotation.id ? ' active' : ''}`} aria-pressed={activeAnnotationId === annotation.id} onClick={() => { setPendingAnnotation(null); setActiveAnnotationId(annotation.id); setAnnotationNote(annotation.note ?? ''); setAnnotationColor(annotation.color); }}><span>{annotation.quote}</span>{annotation.note && <small>{annotation.note}</small>}</button>)}</div>}
+              {(pendingAnnotation || activeAnnotation) && <div className="qbank-annotation-editor">
+                {pendingAnnotation && <p className="qbank-annotation-quote">“{pendingAnnotation.anchor.quote}”</p>}
+                <label className="field"><span>{annotationCopy.note}</span><textarea rows={2} maxLength={1000} value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} placeholder={annotationCopy.placeholder}/></label>
+                <div className="qbank-annotation-colors" role="group" aria-label="Highlight color">
+                  {(['yellow','green','blue','pink','orange'] as const).map((color) => <button key={color} className={`qbank-color-choice annotation-${color}${annotationColor === color ? ' active' : ''}`} type="button" aria-label={`${annotationCopy.colors[color]} highlight`} title={annotationCopy.colors[color]} aria-pressed={annotationColor === color} disabled={annotationBusy} onClick={() => { setAnnotationColor(color); if (activeAnnotation) void updateActiveAnnotation({ color }); }}/>) }
+                </div>
+                <div className="qbank-annotation-actions">
+                  {pendingAnnotation && <button className="btn btn-primary" type="button" disabled={annotationBusy} onClick={() => void saveNewAnnotation()}>{annotationBusy ? m.common.loading : annotationCopy.save}</button>}
+                  {activeAnnotation && <><button className="btn btn-primary" type="button" disabled={annotationBusy || annotationNote === (activeAnnotation.note ?? '')} onClick={() => void updateActiveAnnotation({ note: annotationNote.trim() || null })}>{annotationBusy ? m.common.loading : annotationCopy.saveNote}</button><button className="btn" type="button" disabled={annotationBusy} onClick={() => void deleteActiveAnnotation()}>{annotationCopy.remove}</button></>}
+                  <button className="btn" type="button" disabled={annotationBusy} onClick={() => { setPendingAnnotation(null); setActiveAnnotationId(null); setAnnotationNote(''); }}>{annotationCopy.cancel}</button>
+                </div>
+              </div>}
+              {annotationError && <p className="qbank-annotation-error" role="status">{annotationError}</p>}
+            </section>
+            {hasAnswered && <section className="qbank-feedback" aria-label={feedbackCopy.rate}>
+              <div className="qbank-rating-control"><span className="panel-title">{feedbackCopy.rate}</span><div className="qbank-rating-buttons" role="group" aria-label={feedbackCopy.rate}>{([1,2,3,4,5] as const).map((value) => <button key={value} className={`btn btn-sm${questionRating === value ? ' btn-primary' : ''}`} type="button" aria-label={`${value} / 5`} aria-pressed={questionRating === value} disabled={ratingBusy} onClick={() => void saveQuestionRating(value)}>{value}</button>)}</div></div>
+              <button className="btn" type="button" disabled={reportSubmitted} onClick={() => setReportOpen((open) => !open)}>{reportSubmitted ? feedbackCopy.reportSent : feedbackCopy.report}</button>
+              {feedbackMessage && <p className="qbank-feedback-message" role="status">{feedbackMessage}</p>}
+              {reportOpen && <form className="qbank-report-form" onSubmit={(event) => void submitQuestionReport(event)}>
+                <label className="field"><span>{feedbackCopy.category}</span><select value={reportCategory} onChange={(event) => setReportCategory(event.target.value as IssueCategory)}>{(['incorrect_answer','typo','unclear','outdated','other'] as const).map((category) => <option key={category} value={category}>{feedbackCopy.categories[category]}</option>)}</select></label>
+                <label className="field"><span>{feedbackCopy.message}</span><textarea maxLength={2000} rows={3} value={reportMessage} onChange={(event) => setReportMessage(event.target.value)} placeholder={feedbackCopy.placeholder}/></label>
+                <small className="field-note">{feedbackCopy.noPatient}</small>
+                <div className="qbank-feedback-actions"><button className="btn btn-primary" type="submit" disabled={reportBusy}>{reportBusy ? m.common.loading : feedbackCopy.submit}</button><button className="btn" type="button" disabled={reportBusy} onClick={() => setReportOpen(false)}>{feedbackCopy.cancel}</button></div>
+              </form>}
+            </section>}
             <textarea aria-label={m.qbank.note} value={note} onChange={(event) => setNote(event.target.value)} placeholder={m.qbank.notePlaceholder} />
             <div className="qbank-tool-row">
               <button className={`btn${flashcardStatus === 'saved' ? ' btn-primary' : ''}`} disabled={flashcardStatus === 'saving' || flashcardStatus === 'saved'} onClick={() => void createFlashcardFromQuestion()} type="button">{flashcardStatus === 'saving' ? m.common.loading : flashcardStatus === 'saved' ? m.common.saved : m.qbank.addToFlashcards}</button>
@@ -441,6 +683,13 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
           <div className="qbank-nav-footer"><button className="btn" disabled={currentPosition <= 1 || saving} onClick={() => void load(currentPosition - 1)}>{m.qbank.previous}</button><button className="btn btn-primary" disabled={isLast || saving} onClick={() => void load(currentPosition + 1)}>{m.qbank.next}</button></div>
         </aside>
       </section>}
+      {confirmFinish && <div className="qbank-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmFinish(false); }}>
+        <section className="card card-pad qbank-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="qbank-finish-title" aria-describedby="qbank-finish-description" onKeyDown={(event) => { if (event.key === 'Escape') setConfirmFinish(false); }}>
+          <h2 id="qbank-finish-title">{m.qbank.finishSession}?</h2>
+          <p id="qbank-finish-description">{confirmFinishCopy}</p>
+          <div className="qbank-confirm-actions"><button className="btn" autoFocus type="button" onClick={() => setConfirmFinish(false)}>{m.qbank.previous}</button><button className="btn btn-primary" disabled={saving} type="button" onClick={() => { setConfirmFinish(false); void finish(); }}>{saving ? m.common.loading : m.qbank.finishSession}</button></div>
+        </section>
+      </div>}
     </main>
   );
 }

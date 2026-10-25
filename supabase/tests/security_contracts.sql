@@ -27,6 +27,42 @@ begin
       or not has_function_privilege('authenticated','public.submit_question_answer(uuid,text,integer,smallint,uuid)','EXECUTE') then raise exception 'current submit_question_answer signature missing'; end if;
   if not has_function_privilege('authenticated','public.set_question_taxonomy(uuid,uuid[])','EXECUTE') then raise exception 'taxonomy RPC missing'; end if;
   if not exists(select 1 from pg_indexes where schemaname='public' and indexname='taxonomy_nodes_root_slug_uidx') then raise exception 'root taxonomy uniqueness index missing'; end if;
+  if to_regclass('public.question_annotations') is not null then
+    select relrowsecurity into v from pg_class where oid='public.question_annotations'::regclass;
+    if not v then raise exception 'question annotation RLS is disabled'; end if;
+    if has_table_privilege('anon','public.question_annotations','SELECT') then raise exception 'anon can read private question annotations'; end if;
+    if pg_get_functiondef('public.consume_rate_limit(text,integer,integer)'::regprocedure) not ilike '%qbank_annotation%' then raise exception 'annotation rate limit action missing'; end if;
+  end if;
+  if to_regclass('public.qbank_question_ratings') is not null then
+    select relrowsecurity into v from pg_class where oid='public.qbank_question_ratings'::regclass;
+    if not v then raise exception 'QBank ratings RLS is disabled'; end if;
+    if has_table_privilege('anon','public.qbank_question_ratings','SELECT') then raise exception 'anon can read private QBank ratings'; end if;
+  end if;
+  if to_regclass('public.qbank_question_reports') is not null then
+    select relrowsecurity into v from pg_class where oid='public.qbank_question_reports'::regclass;
+    if not v then raise exception 'QBank report RLS is disabled'; end if;
+    if has_table_privilege('anon','public.qbank_question_reports','SELECT') then raise exception 'anon can read private QBank reports'; end if;
+    if not has_function_privilege('authenticated','public.admin_list_qbank_question_reports(text,integer)','EXECUTE') then raise exception 'admin QBank report queue RPC missing'; end if;
+    if not has_function_privilege('authenticated','public.admin_update_qbank_question_report(uuid,text,text)','EXECUTE') then raise exception 'admin QBank report update RPC missing'; end if;
+    if pg_get_functiondef('public.consume_rate_limit(text,integer,integer)'::regprocedure) not ilike '%qbank_feedback%' then raise exception 'QBank feedback rate limit action missing'; end if;
+  end if;
+  if to_regclass('public.lab_values') is not null then
+    select relrowsecurity into v from pg_class where oid='public.lab_values'::regclass;
+    if not v then raise exception 'lab values RLS is disabled'; end if;
+    if has_table_privilege('anon','public.lab_values','SELECT') then raise exception 'anon can read clinical lab reference values'; end if;
+    if has_table_privilege('authenticated','public.lab_values','INSERT') then raise exception 'authenticated can write clinical lab values directly'; end if;
+    if not has_function_privilege('authenticated','public.admin_list_lab_values(text)','EXECUTE') then raise exception 'admin lab values review RPC missing'; end if;
+    if not has_function_privilege('authenticated','public.admin_upsert_lab_value(uuid,text,text,text,text,text,text,text,text,text,text)','EXECUTE') then raise exception 'admin lab values write RPC missing'; end if;
+  end if;
+  if to_regclass('public.study_sessions') is not null and exists(select 1 from information_schema.columns where table_schema='public' and table_name='study_sessions' and column_name='practice_pause_started_at') then
+    if not has_function_privilege('authenticated','public.pause_practice_session(uuid)','EXECUTE') then raise exception 'practice pause RPC missing'; end if;
+    if not has_function_privilege('authenticated','public.resume_practice_session(uuid)','EXECUTE') then raise exception 'practice resume RPC missing'; end if;
+    if has_function_privilege('anon','public.pause_practice_session(uuid)','EXECUTE') then raise exception 'anon can pause practice sessions'; end if;
+  end if;
+  if to_regprocedure('public.list_my_qbank_library(integer)') is not null then
+    if not has_function_privilege('authenticated','public.list_my_qbank_library(integer)','EXECUTE') then raise exception 'personal QBank library RPC missing'; end if;
+    if has_function_privilege('anon','public.list_my_qbank_library(integer)','EXECUTE') then raise exception 'anon can read personal QBank library'; end if;
+  end if;
 end $$;
 
 -- Every SECURITY DEFINER function in public must pin an empty search_path.
