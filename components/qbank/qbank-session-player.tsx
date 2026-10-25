@@ -530,7 +530,18 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     try {
       const response = await fetch('/api/qbank/annotations', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: crypto.randomUUID(), questionId: question.id, segmentKey: pendingAnnotation.segmentKey, ...pendingAnnotation.anchor, color: annotationColor, note: annotationNote.trim() || null }),
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          questionId: question.id,
+          segmentKey: pendingAnnotation.segmentKey,
+          quote: pendingAnnotation.anchor.quote,
+          prefix: pendingAnnotation.anchor.prefix,
+          suffix: pendingAnnotation.anchor.suffix,
+          startOffset: pendingAnnotation.anchor.start_offset,
+          endOffset: pendingAnnotation.anchor.end_offset,
+          color: annotationColor,
+          note: annotationNote.trim() || null,
+        }),
       });
       const body = await readJson<QuestionAnnotation & ApiErrorBody>(response);
       if (!response.ok) throw new Error(annotationCopy.saveError);
