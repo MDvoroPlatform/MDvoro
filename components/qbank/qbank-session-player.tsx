@@ -8,6 +8,7 @@ import { useI18n } from '@/components/i18n/provider';
 import { AnnotationText, type QuestionAnnotation } from '@/components/qbank/annotation-text';
 import { createTextAnchor, type AnnotationAnchor } from '@/lib/qbank/annotation-anchor';
 import { Icon } from '@/components/ui/icons';
+import { LabValuesBrowser, type LabValueRow } from '@/components/library/lab-values-browser';
 
 type SessionItem = {
   position: number;
@@ -123,13 +124,18 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [infoTab, setInfoTab] = useState<'key-info' | 'attending-tip' | 'labs'>('key-info');
   const [isSaved, setIsSaved] = useState(false);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [labValues, setLabValues] = useState<LabValueRow[] | null>(null);
+  const [labsLoading, setLabsLoading] = useState(false);
+  const [labsError, setLabsError] = useState(false);
   const timerCopy = ({ en: { elapsed: 'Elapsed', pause: 'Pause', resume: 'Resume', paused: 'Practice paused' }, he: { elapsed: 'זמן שחלף', pause: 'השהה', resume: 'המשך', paused: 'התרגול מושהה' }, ar: { elapsed: 'الوقت المنقضي', pause: 'إيقاف مؤقت', resume: 'استئناف', paused: 'التدريب متوقف مؤقتًا' }, ru: { elapsed: 'Прошло', pause: 'Пауза', resume: 'Продолжить', paused: 'Практика приостановлена' } } as const)[locale];
   const clinicalCopy = ({
-    en: { keyInfo: 'Key info', attendingTip: 'Attending tip', labs: 'Labs', reviewAfterAnswer: 'Answer the question to review its explanation and key information.', noTip: 'No attending tip is available for this question.', noLabs: 'No question-specific laboratory values are available.', elapsed: 'Elapsed' },
-    ar: { keyInfo: 'معلومات أساسية', attendingTip: 'نصيحة الاستشاري', labs: 'المختبرات', reviewAfterAnswer: 'أجب عن السؤال لمراجعة الشرح والمعلومات الأساسية.', noTip: 'لا تتوفر نصيحة استشاري لهذا السؤال.', noLabs: 'لا توجد قيم مخبرية مرتبطة بهذا السؤال.', elapsed: 'المنقضي' },
-    he: { keyInfo: 'מידע מרכזי', attendingTip: 'טיפ מהמומחה', labs: 'בדיקות', reviewAfterAnswer: 'יש לענות על השאלה כדי לעיין בהסבר ובמידע המרכזי.', noTip: 'אין טיפ מומחה זמין לשאלה זו.', noLabs: 'אין ערכי מעבדה הקשורים לשאלה זו.', elapsed: 'זמן שחלף' },
-    ru: { keyInfo: 'Главное', attendingTip: 'Совет врача', labs: 'Анализы', reviewAfterAnswer: 'Ответьте на вопрос, чтобы просмотреть объяснение и ключевую информацию.', noTip: 'Для этого вопроса нет совета врача.', noLabs: 'Для этого вопроса нет связанных лабораторных значений.', elapsed: 'Прошло' },
+    en: { keyInfo: 'Key info', attendingTip: 'Attending tip', labs: 'Labs', reviewAfterAnswer: 'Answer the question to review its explanation and key information.', noTip: 'No attending tip is available for this question.', referenceRanges: 'Approved reference ranges', referenceNote: 'General educational ranges, not values specific to this question. Use the range reported by the testing laboratory.', labsUnavailable: 'Reference ranges could not be loaded.', elapsed: 'Elapsed' },
+    ar: { keyInfo: 'معلومات أساسية', attendingTip: 'نصيحة الاستشاري', labs: 'المختبرات', reviewAfterAnswer: 'أجب عن السؤال لمراجعة الشرح والمعلومات الأساسية.', noTip: 'لا تتوفر نصيحة استشاري لهذا السؤال.', referenceRanges: 'القيم المرجعية المعتمدة', referenceNote: 'مجالات تعليمية عامة وليست نتائج خاصة بهذا السؤال. اعتمد المجال المطبوع في تقرير المختبر.', labsUnavailable: 'تعذر تحميل القيم المرجعية.', elapsed: 'المنقضي' },
+    he: { keyInfo: 'מידע מרכזי', attendingTip: 'טיפ מהמומחה', labs: 'בדיקות', reviewAfterAnswer: 'יש לענות על השאלה כדי לעיין בהסבר ובמידע המרכזי.', noTip: 'אין טיפ מומחה זמין לשאלה זו.', referenceRanges: 'טווחי ייחוס מאושרים', referenceNote: 'טווחים לימודיים כלליים, לא ערכים ספציפיים לשאלה. יש להשתמש בטווח שמופיע בדוח המעבדה.', labsUnavailable: 'לא ניתן לטעון את טווחי הייחוס.', elapsed: 'זמן שחלף' },
+    ru: { keyInfo: 'Главное', attendingTip: 'Совет врача', labs: 'Анализы', reviewAfterAnswer: 'Ответьте на вопрос, чтобы просмотреть объяснение и ключевую информацию.', noTip: 'Для этого вопроса нет совета врача.', referenceRanges: 'Утверждённые референсные интервалы', referenceNote: 'Общие учебные интервалы, не значения для этого вопроса. Используйте диапазон из бланка лаборатории.', labsUnavailable: 'Не удалось загрузить референсные интервалы.', elapsed: 'Прошло' },
   } as const)[locale];
+  const sessionActions = ({ en: { exit: 'Exit to history', leaving: 'Saving…', leaveError: 'Could not save this session before leaving.' }, ar: { exit: 'الخروج إلى سجل الجلسات', leaving: 'جارٍ الحفظ…', leaveError: 'تعذر حفظ الجلسة قبل الخروج.' }, he: { exit: 'יציאה להיסטוריה', leaving: 'שומר…', leaveError: 'לא ניתן לשמור את המפגש לפני היציאה.' }, ru: { exit: 'Выйти в историю', leaving: 'Сохранение…', leaveError: 'Не удалось сохранить сессию перед выходом.' } } as const)[locale];
 
   const currentPosition = state?.session.current_position ?? 1;
   const isLast = currentPosition >= (state?.session.requested_count ?? 0);
@@ -396,6 +402,49 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     } finally { setBreakBusy(false); }
   }, [breakBusy, currentPosition, load, sessionId, state, timerCopy.resume]);
 
+  const loadLabs = useCallback(async () => {
+    if (labValues || labsLoading) return;
+    setLabsLoading(true);
+    setLabsError(false);
+    try {
+      const response = await fetch('/api/qbank/labs', { cache: 'no-store' });
+      const body = await readJson<{ values?: LabValueRow[] } & ApiErrorBody>(response);
+      if (!response.ok || !body.values) throw new Error(body.error ?? 'labs_unavailable');
+      setLabValues(body.values);
+    } catch {
+      setLabsError(true);
+    } finally {
+      setLabsLoading(false);
+    }
+  }, [labValues, labsLoading]);
+
+  const exitToHistory = useCallback(async () => {
+    if (!state || leaving || saving) return;
+    setLeaving(true);
+    setError(null);
+    try {
+      if (!state.session.on_break && state.question && note !== (state.question.note ?? '')) {
+        const marked = state.items.find((item) => item.position === currentPosition)?.marked ?? false;
+        const response = await fetch(`/api/qbank/session/${sessionId}/state`, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ position: currentPosition, marked, note }),
+        });
+        if (!response.ok) throw new Error('save_failed');
+      }
+      if (state.session.mode === 'practice' && !state.session.on_break) {
+        const response = await fetch(`/api/qbank/session/${sessionId}/timer`, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ action: 'pause' }),
+        });
+        if (!response.ok) throw new Error('pause_failed');
+      }
+      router.push('/qbank/history');
+    } catch {
+      setError(sessionActions.leaveError);
+      setLeaving(false);
+    }
+  }, [currentPosition, leaving, note, router, saving, sessionActions.leaveError, sessionId, state]);
+
   useEffect(() => {
     if (!state) return;
     const question = state.question;
@@ -629,6 +678,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         <div className="qbank-session-toolbar">
           {(isExam ? remaining !== null : true) && <span className="session-timer"><Icon name="clock" size={18}/>{formatTime(isExam ? remaining ?? 0 : elapsedSeconds)}</span>}
           {isExam && blockRemaining !== null && !state.session.on_break && <span className="session-timer qbank-block-timer">{m.qbank.blockTime}: {formatTime(blockRemaining)}</span>}
+          <button className="btn" disabled={saving || leaving} onClick={() => void exitToHistory()} type="button"><Icon name="logout" size={18}/>{leaving ? sessionActions.leaving : sessionActions.exit}</button>
           <button className="btn qbank-header-exit" disabled={saving} onClick={() => setConfirmFinish(true)} type="button"><Icon name="logout" size={18}/>{m.qbank.finishSession}</button>
         </div>
       </header>
@@ -716,12 +766,17 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
               <div className="qbank-clinical-tabs" role="tablist" aria-label="Question learning information">
                 <button id="qbank-tab-key-info" role="tab" aria-selected={infoTab === 'key-info'} aria-controls="qbank-panel-key-info" type="button" onClick={() => setInfoTab('key-info')}><Icon name="book" size={18}/>{clinicalCopy.keyInfo}</button>
                 <button id="qbank-tab-attending-tip" role="tab" aria-selected={infoTab === 'attending-tip'} aria-controls="qbank-panel-attending-tip" type="button" onClick={() => setInfoTab('attending-tip')}><Icon name="spark" size={18}/>{clinicalCopy.attendingTip}</button>
-                <button id="qbank-tab-labs" role="tab" aria-selected={infoTab === 'labs'} aria-controls="qbank-panel-labs" type="button" onClick={() => setInfoTab('labs')}><Icon name="flask" size={18}/>{clinicalCopy.labs}</button>
+                <button id="qbank-tab-labs" role="tab" aria-selected={infoTab === 'labs'} aria-controls="qbank-panel-labs" type="button" onClick={() => { setInfoTab('labs'); void loadLabs(); }}><Icon name="flask" size={18}/>{clinicalCopy.labs}</button>
               </div>
               <div className="qbank-clinical-panel" id={`qbank-panel-${infoTab}`} role="tabpanel" aria-labelledby={`qbank-tab-${infoTab}`}>
                 {infoTab === 'key-info' && (hasAnswered && (question.explanation || question.key_learning_point) ? <div className="qbank-key-info">{question.explanation && <p><AnnotationText text={question.explanation} segmentKey="explanation" annotations={questionAnnotations}/></p>}{question.key_learning_point && <div className="learning-point"><b>{m.qbank.keyLearning}</b><span><AnnotationText text={question.key_learning_point} segmentKey="key_learning_point" annotations={questionAnnotations}/></span></div>}</div> : <div className="qbank-info-empty"><Icon name="book" size={19}/><span>{hasAnswered ? m.qbank.noQuestion : clinicalCopy.reviewAfterAnswer}</span></div>)}
                 {infoTab === 'attending-tip' && <div className="qbank-info-empty"><Icon name="spark" size={19}/><span>{clinicalCopy.noTip}</span></div>}
-                {infoTab === 'labs' && <div className="qbank-info-empty"><Icon name="flask" size={19}/><span>{clinicalCopy.noLabs}</span></div>}
+                {infoTab === 'labs' && <div className="qbank-labs-panel">
+                  <div className="lab-reference-note" role="note"><p><strong>{clinicalCopy.referenceRanges}.</strong> {clinicalCopy.referenceNote}</p></div>
+                  {labsLoading && <p className="panel-sub" role="status">{m.common.loading}</p>}
+                  {labsError && <div className="qbank-info-empty" role="alert"><Icon name="flask" size={19}/><span>{clinicalCopy.labsUnavailable}</span><button className="btn btn-sm" type="button" onClick={() => void loadLabs()}>{m.common.retry}</button></div>}
+                  {labValues && (labValues.length ? <LabValuesBrowser values={labValues}/> : <div className="qbank-info-empty"><Icon name="flask" size={19}/><span>{clinicalCopy.labsUnavailable}</span></div>)}
+                </div>}
               </div>
             </div>
             <nav className="qbank-card-navigation" aria-label={m.qbank.navigator}>
