@@ -50,9 +50,10 @@ create or replace function public.admin_upsert_lab_value(
 returns uuid language plpgsql volatile security definer set search_path='' as $$
 declare v_id uuid; v_old_status text;
 begin
-  if not public.has_permission('content.write') then raise exception 'forbidden'; end if;
+  if not public.has_permission('content.write') and not public.has_permission('content.review') then raise exception 'forbidden'; end if;
   if p_category not in ('hematology','electrolytes','renal','liver','endocrine','other') then raise exception 'invalid_category'; end if;
   if p_status not in ('pending','in_review','approved','archived') then raise exception 'invalid_status'; end if;
+  if p_status='approved' and not public.has_permission('content.review') then raise exception 'review_permission_required'; end if;
   if p_status='approved' and nullif(trim(coalesce(p_source_reference,'')),'') is null then raise exception 'source_required_for_approval'; end if;
   if length(trim(coalesce(p_name,''))) not between 1 and 160 or length(trim(coalesce(p_reference_range,''))) not between 1 and 240
     or length(trim(coalesce(p_unit,''))) not between 1 and 40 or length(trim(coalesce(p_si_reference_range,''))) not between 1 and 240

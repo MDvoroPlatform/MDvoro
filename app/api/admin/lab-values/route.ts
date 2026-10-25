@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireContentReviewer } from '@/lib/server/authorization';
+import { requireRole } from '@/lib/server/authorization';
 import { apiError, assertMutationRequest, enforceRateLimit, readJson } from '@/lib/server/api';
 import { adminLabValueSchema } from '@/lib/validation/qbank';
 
@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   const blocked = assertMutationRequest(request);
   if (blocked) return blocked;
   try {
-    const { supabase } = await requireContentReviewer();
+    const { supabase } = await requireRole(['super_admin','admin','editor','reviewer']);
     const value = adminLabValueSchema.parse(await readJson(request));
     await enforceRateLimit(supabase, 'admin_write', 120, 60);
     const { data, error } = await supabase.rpc('admin_upsert_lab_value', {

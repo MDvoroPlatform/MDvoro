@@ -15,6 +15,7 @@ describe('reviewed lab values', () => {
   it('keeps student access restricted to approved values with reviewer traceability', () => {
     expect(migration).toMatch(/using\(status='approved'\)/i);
     expect(migration).toMatch(/has_permission\('content\.write'\)/i);
+    expect(migration).toMatch(/has_permission\('content\.review'\)/i);
     expect(migration).toMatch(/reviewed_by uuid/i);
     expect(migration).toMatch(/source_required_for_approval/i);
     expect(migration).not.toMatch(/\b(insert\s+into|update|delete\s+from|truncate)\s+public\.questions\b/i);
