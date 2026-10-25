@@ -208,9 +208,9 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       setRemaining(Math.max(0, total - wallElapsed));
       const pausedNow = state.session.on_break && state.session.break_started_at
         ? Math.max(0, Math.floor((Date.now() - new Date(state.session.break_started_at).getTime()) / 1000)) : 0;
-      setElapsedSeconds(Math.max(0, wallElapsed - state.session.break_seconds_used - pausedNow));
+      setElapsedSeconds(Math.max(0, wallElapsed - (state.session.break_seconds_used ?? 0) - pausedNow));
       if (state.session.mode === 'exam' && state.session.block_duration_minutes > 0 && !state.session.on_break) {
-        const activeElapsed = Math.max(0, wallElapsed - state.session.break_seconds_used);
+        const activeElapsed = Math.max(0, wallElapsed - (state.session.break_seconds_used ?? 0));
         const blockSeconds = state.session.block_duration_minutes * 60;
         setBlockRemaining(blockSeconds - (activeElapsed % blockSeconds));
       } else {
