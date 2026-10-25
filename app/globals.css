@@ -441,6 +441,30 @@ html.dark .form-message.error,html[data-theme="dark"] .form-message.error{backgr
 
 :root { --page: var(--bg); }
 .qbank-session-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.qbank-session-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px}.qbank-session-sidebar{height:max-content;position:sticky;top:96px}.qbank-tool-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.qbank-session-tools textarea{width:100%;min-height:84px;margin-top:14px}.qbank-navigator-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:12px;max-height:430px;overflow:auto}.qbank-nav-item{height:34px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:10px;font-weight:900;color:var(--muted)}.qbank-nav-item.current{border-color:var(--brand);box-shadow:0 0 0 2px rgba(27,115,232,.08);color:var(--brand)}.qbank-nav-item.answered{color:var(--ink)}.qbank-nav-item.marked:after{content:'•';display:block;color:var(--brand);font-size:12px;line-height:7px}.session-progress{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted);font-weight:800}.qbank-nav-footer{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.qbank-session-sidebar .qbank-nav-item:disabled{opacity:.45;cursor:not-allowed}.session-timer{font-variant-numeric:tabular-nums;font-weight:900}.break-panel{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-bottom:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-muted)}.key-terms{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.key-terms span{padding:5px 8px;border-radius:999px;background:var(--surface-muted);border:1px solid var(--line);font-size:11px;font-weight:900}@media(max-width:900px){.qbank-session-layout{grid-template-columns:1fr}.qbank-session-sidebar{position:static;order:2}.qbank-session-toolbar{width:100%;justify-content:flex-start}.qbank-navigator-grid{grid-template-columns:repeat(8,minmax(0,1fr));max-height:180px}}@media(max-width:560px){.qbank-navigator-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.qbank-session-toolbar{gap:6px}.qbank-session-toolbar .btn{flex:1}}
+
+/* A live question session is a focused workspace. Keep the normal application chrome
+   mounted for client navigation, but remove it from the visual and accessibility tree. */
+.shell:has([data-active-qbank-session]){grid-template-columns:minmax(0,1fr)}
+.shell:has([data-active-qbank-session])>.sidebar,
+.shell:has([data-active-qbank-session]) .topbar,
+.shell:has([data-active-qbank-session]) .mdvoro-footer{display:none}
+.shell:has([data-active-qbank-session])>.main{min-height:100vh}
+.shell:has([data-active-qbank-session]) [data-active-qbank-session]{max-width:1440px;margin-inline:auto;padding-block:24px}
+.qbank-confirm-backdrop{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(5,16,33,.56);backdrop-filter:blur(5px)}
+.qbank-confirm-dialog{width:min(100%,440px);box-shadow:var(--shadow-md)}
+.qbank-confirm-dialog h2{margin:0 0 8px;font-size:20px}
+.qbank-confirm-dialog p{margin:0;color:var(--muted);line-height:1.6}
+.qbank-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+@media(max-width:560px){
+  .shell:has([data-active-qbank-session]) [data-active-qbank-session]{padding:14px 12px calc(110px + env(safe-area-inset-bottom))}
+  .shell:has([data-active-qbank-session]) .page-head{gap:8px;margin-bottom:10px}
+  .shell:has([data-active-qbank-session]) .page-head h1{font-size:21px}
+  .shell:has([data-active-qbank-session]) .qbank-session-toolbar{position:fixed;z-index:60;inset-inline:10px;bottom:calc(8px + env(safe-area-inset-bottom));width:auto;padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-md)}
+  .shell:has([data-active-qbank-session]) .qbank-shortcuts{display:none}
+  .shell:has([data-active-qbank-session]) .qbank-session-toolbar .session-timer{min-width:78px;padding:8px;font-size:13px}
+  .qbank-confirm-actions{flex-direction:column-reverse}
+  .qbank-confirm-actions .btn{width:100%}
+}
 .result-review-list{display:grid;gap:14px}.result-review-card{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--surface)}.result-review-card.correct{border-inline-start:3px solid #168a52}.result-review-card.incorrect{border-inline-start:3px solid #d64545}.result-review-card.unanswered{border-inline-start:3px solid #9a7b1f}.result-review-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.result-stem{margin:14px 0;font-size:15px;line-height:1.65}.result-options{display:grid;gap:8px}.result-option{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--line);border-radius:10px}.result-option.correct{border-color:#168a52;background:color-mix(in srgb,#168a52 7%,transparent)}.result-option.selected-wrong{border-color:#d64545;background:color-mix(in srgb,#d64545 7%,transparent)}.result-option em{font-style:normal;font-size:11px;font-weight:900}.field-label-row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}.filter-actions{display:flex;gap:6px;flex-wrap:wrap}
 
 .legal-agent-card{padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-muted)}.legal-agent-card p{margin:4px 0}

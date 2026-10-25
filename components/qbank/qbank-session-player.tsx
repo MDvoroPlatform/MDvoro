@@ -82,7 +82,7 @@ async function readJson<T>(response: Response): Promise<T> {
 
 export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const router = useRouter();
-  const { messages: m } = useI18n();
+  const { messages: m, locale } = useI18n();
   const [state, setState] = useState<SessionState | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -97,6 +97,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [questionStartedAt, setQuestionStartedAt] = useState<number>(() => Date.now());
   const [confidence, setConfidence] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [flashcardStatus, setFlashcardStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [confirmFinish, setConfirmFinish] = useState(false);
 
   const currentPosition = state?.session.current_position ?? 1;
   const isLast = currentPosition >= (state?.session.requested_count ?? 0);
@@ -351,6 +352,13 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     }
   }, [m.qbank.couldNotFinish, router, saving, sessionId, state]);
 
+  const confirmFinishCopy = {
+    en: 'Finish this session now? Your recorded answers and progress will be saved.',
+    ar: 'هل تريد إنهاء الجلسة الآن؟ ستُحفظ إجاباتك وتقدمك المسجل.',
+    he: 'לסיים את המפגש עכשיו? התשובות וההתקדמות שנשמרו יישארו זמינות.',
+    ru: 'Завершить сессию сейчас? Записанные ответы и прогресс будут сохранены.',
+  }[locale] ?? 'Finish this session now? Your recorded answers and progress will be saved.';
+
   const media = useMemo(() => [...(state?.question?.media ?? [])].sort((a, b) => a.position - b.position), [state?.question?.media]);
 
   if (loading && !state) return <main className="page-shell"><div className="card card-pad">{m.common.loading}</div></main>;
@@ -361,7 +369,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const currentItem = state.items.find((item) => item.position === currentPosition);
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" data-active-qbank-session>
       <div className="page-head">
         <div>
           <div className="eyebrow">{state.session.exam_code} · {isExam ? m.qbank.examMode : m.qbank.practiceMode}</div>
@@ -370,7 +378,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         </div>
         <div className="qbank-session-toolbar"><span className="qbank-shortcuts">1–9 answer · Enter submit · M mark · → next</span>
           {remaining !== null && <span className="session-timer">{formatTime(remaining)}</span>}{isExam && blockRemaining !== null && !state.session.on_break && <span className="session-timer">{m.qbank.blockTime}: {formatTime(blockRemaining)}</span>}
-          <button className="btn btn-primary" disabled={saving} onClick={() => void finish()} type="button">{m.qbank.finishSession}</button>
+          <button className="btn btn-primary" disabled={saving} onClick={() => setConfirmFinish(true)} type="button">{m.qbank.finishSession}</button>
         </div>
       </div>
 
@@ -441,6 +449,13 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
           <div className="qbank-nav-footer"><button className="btn" disabled={currentPosition <= 1 || saving} onClick={() => void load(currentPosition - 1)}>{m.qbank.previous}</button><button className="btn btn-primary" disabled={isLast || saving} onClick={() => void load(currentPosition + 1)}>{m.qbank.next}</button></div>
         </aside>
       </section>}
+      {confirmFinish && <div className="qbank-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmFinish(false); }}>
+        <section className="card card-pad qbank-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="qbank-finish-title" aria-describedby="qbank-finish-description" onKeyDown={(event) => { if (event.key === 'Escape') setConfirmFinish(false); }}>
+          <h2 id="qbank-finish-title">{m.qbank.finishSession}?</h2>
+          <p id="qbank-finish-description">{confirmFinishCopy}</p>
+          <div className="qbank-confirm-actions"><button className="btn" autoFocus type="button" onClick={() => setConfirmFinish(false)}>{m.qbank.previous}</button><button className="btn btn-primary" disabled={saving} type="button" onClick={() => { setConfirmFinish(false); void finish(); }}>{saving ? m.common.loading : m.qbank.finishSession}</button></div>
+        </section>
+      </div>}
     </main>
   );
 }
