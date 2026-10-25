@@ -54,6 +54,11 @@ begin
     if not has_function_privilege('authenticated','public.admin_list_lab_values(text)','EXECUTE') then raise exception 'admin lab values review RPC missing'; end if;
     if not has_function_privilege('authenticated','public.admin_upsert_lab_value(uuid,text,text,text,text,text,text,text,text,text,text)','EXECUTE') then raise exception 'admin lab values write RPC missing'; end if;
   end if;
+  if to_regclass('public.study_sessions') is not null and exists(select 1 from information_schema.columns where table_schema='public' and table_name='study_sessions' and column_name='practice_pause_started_at') then
+    if not has_function_privilege('authenticated','public.pause_practice_session(uuid)','EXECUTE') then raise exception 'practice pause RPC missing'; end if;
+    if not has_function_privilege('authenticated','public.resume_practice_session(uuid)','EXECUTE') then raise exception 'practice resume RPC missing'; end if;
+    if has_function_privilege('anon','public.pause_practice_session(uuid)','EXECUTE') then raise exception 'anon can pause practice sessions'; end if;
+  end if;
 end $$;
 
 -- Every SECURITY DEFINER function in public must pin an empty search_path.

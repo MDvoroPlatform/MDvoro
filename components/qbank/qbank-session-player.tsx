@@ -58,6 +58,7 @@ type SessionState = {
     break_seconds_used: number;
     break_remaining_seconds: number;
     break_started_at: string | null;
+    practice_paused_seconds: number;
     on_break: boolean;
   };
   question: Question | null;
@@ -91,6 +92,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [note, setNote] = useState('');
   const [keyVisible, setKeyVisible] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +118,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [reportBusy, setReportBusy] = useState(false);
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
+  const timerCopy = ({ en: { elapsed: 'Elapsed', pause: 'Pause', resume: 'Resume', paused: 'Practice paused' }, he: { elapsed: 'זמן שחלף', pause: 'השהה', resume: 'המשך', paused: 'התרגול מושהה' }, ar: { elapsed: 'الوقت المنقضي', pause: 'إيقاف مؤقت', resume: 'استئناف', paused: 'التدريب متوقف مؤقتًا' }, ru: { elapsed: 'Прошло', pause: 'Пауза', resume: 'Продолжить', paused: 'Практика приостановлена' } } as const)[locale];
 
   const currentPosition = state?.session.current_position ?? 1;
   const isLast = currentPosition >= (state?.session.requested_count ?? 0);
@@ -171,8 +174,21 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   }, [load]);
 
   useEffect(() => {
-    if (!state?.session.time_limit_seconds) return;
+    if (!state) return;
     const started = new Date(state.session.started_at).getTime();
+    if (state.session.mode === 'practice') {
+      const tick = () => {
+        const wallElapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
+        const pausedNow = state.session.on_break && state.session.break_started_at
+          ? Math.max(0, Math.floor((Date.now() - new Date(state.session.break_started_at).getTime()) / 1000)) : 0;
+        setElapsedSeconds(Math.max(0, wallElapsed - state.session.practice_paused_seconds - pausedNow));
+      };
+      tick();
+      if (state.session.on_break) return;
+      const timer = window.setInterval(tick, 1000);
+      return () => window.clearInterval(timer);
+    }
+    if (!state.session.time_limit_seconds) return;
     const total = state.session.time_limit_seconds;
     const tick = () => {
       const wallElapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
@@ -188,7 +204,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
-  }, [state?.session]);
+  }, [state]);
 
   useEffect(() => {
     if (!state?.session.on_break) return;
@@ -329,6 +345,22 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       setBreakBusy(false);
     }
   }, [breakBusy, currentPosition, load, m.qbank.couldNotResume, sessionId, state]);
+
+  const togglePracticePause = useCallback(async () => {
+    if (!state || state.session.mode !== 'practice' || breakBusy) return;
+    setBreakBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/qbank/session/${sessionId}/timer`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: state.session.on_break ? 'resume' : 'pause' }),
+      });
+      if (!response.ok) throw new Error(timerCopy.resume);
+      await load(currentPosition);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : timerCopy.resume);
+    } finally { setBreakBusy(false); }
+  }, [breakBusy, currentPosition, load, sessionId, state, timerCopy.resume]);
 
   useEffect(() => {
     if (!state) return;
@@ -550,7 +582,8 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
           <p className="subtitle">{state.session.exam_name} · {m.qbank.blocks} {state.session.current_block}/{state.session.block_count}</p>
         </div>
         <div className="qbank-session-toolbar"><span className="qbank-shortcuts">1–9 answer · Enter submit · M mark · → next</span>
-          {remaining !== null && <span className="session-timer">{formatTime(remaining)}</span>}{isExam && blockRemaining !== null && !state.session.on_break && <span className="session-timer">{m.qbank.blockTime}: {formatTime(blockRemaining)}</span>}
+          {isExam && remaining !== null && <span className="session-timer">{formatTime(remaining)}</span>}{!isExam && <span className="session-timer">{timerCopy.elapsed}: {formatTime(elapsedSeconds)}</span>}{isExam && blockRemaining !== null && !state.session.on_break && <span className="session-timer">{m.qbank.blockTime}: {formatTime(blockRemaining)}</span>}
+          {!isExam && <button className="btn" disabled={breakBusy} onClick={() => void togglePracticePause()} type="button">{state.session.on_break ? timerCopy.resume : timerCopy.pause}</button>}
           <button className="btn btn-primary" disabled={saving} onClick={() => setConfirmFinish(true)} type="button">{m.qbank.finishSession}</button>
         </div>
       </div>
@@ -561,7 +594,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         <div className="break-panel"><span>{m.qbank.breakAvailable} · {Math.ceil(state.session.break_remaining_seconds / 60)} min</span><button className="btn" disabled={breakBusy} onClick={() => void startBreak()} type="button">{m.qbank.takeBreak}</button></div>
       )}
       {state.session.on_break && (
-        <div className="break-panel"><div><strong>{m.qbank.onBreak}</strong><div className="panel-sub">{m.qbank.breakRemaining}: {formatTime(breakRemaining)}</div></div><button className="btn btn-primary" disabled={breakBusy || breakRemaining <= 0} onClick={() => void endBreak()} type="button">{m.qbank.resumeExam}</button></div>
+        <div className="break-panel"><div><strong>{!isExam ? timerCopy.paused : m.qbank.onBreak}</strong>{isExam && <div className="panel-sub">{m.qbank.breakRemaining}: {formatTime(breakRemaining)}</div>}</div>{isExam && <button className="btn btn-primary" disabled={breakBusy || breakRemaining <= 0} onClick={() => void endBreak()} type="button">{m.qbank.resumeExam}</button>}</div>
       )}
 
       {!state.session.on_break && question && <section className="qbank-session-layout" onMouseUp={captureTextSelection} onTouchEnd={captureTextSelection} onKeyUp={captureTextSelection}>
