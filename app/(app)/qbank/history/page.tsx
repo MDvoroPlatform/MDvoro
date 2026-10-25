@@ -25,6 +25,7 @@ export default async function QBankHistoryPage() {
     if (status === 'in_progress') return { en: 'In progress', ar: 'قيد التقدم', he: 'בתהליך', ru: 'В процессе' }[locale];
     return status.replaceAll('_', ' ');
   };
+  const resumeText = { en: 'Resume session', ar: 'استئناف الجلسة', he: 'חידוש מפגש', ru: 'Продолжить сессию' }[locale];
 
   return (
     <div className="page qbank-history-page">
@@ -56,7 +57,7 @@ export default async function QBankHistoryPage() {
                   <div><small>{m.qbank.questions}</small><strong>{row.answered_count}<span> / {row.requested_count}</span></strong></div>
                   <div><small>{m.qbank.score}</small><strong>{row.score_percent == null ? '—' : `${row.score_percent}%`}</strong>{accuracy !== null && <em>{accuracy}% {m.qbank.correctAnswers}</em>}</div>
                 </div>
-                <Link className="btn qbank-history-open" href={href}>{row.status === 'in_progress' ? m.qbank.session : m.qbank.questionReview}</Link>
+                <Link className="btn qbank-history-open" href={href}>{row.status === 'in_progress' ? resumeText : m.qbank.questionReview}</Link>
               </article>
             );
           })}
