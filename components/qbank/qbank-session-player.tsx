@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n/provider';
 import { AnnotationText, type QuestionAnnotation } from '@/components/qbank/annotation-text';
 import { createTextAnchor, type AnnotationAnchor } from '@/lib/qbank/annotation-anchor';
+import { Icon } from '@/components/ui/icons';
 
 type SessionItem = {
   position: number;
@@ -32,6 +33,7 @@ type Question = {
   selected_answer: string | null;
   is_correct: boolean | null;
   correct_answer: string | null;
+  is_saved?: boolean;
   explanation: string | null;
   key_learning_point: string | null;
   note: string | null;
@@ -118,7 +120,16 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [reportBusy, setReportBusy] = useState(false);
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [infoTab, setInfoTab] = useState<'key-info' | 'attending-tip' | 'labs'>('key-info');
+  const [isSaved, setIsSaved] = useState(false);
+  const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const timerCopy = ({ en: { elapsed: 'Elapsed', pause: 'Pause', resume: 'Resume', paused: 'Practice paused' }, he: { elapsed: 'זמן שחלף', pause: 'השהה', resume: 'המשך', paused: 'התרגול מושהה' }, ar: { elapsed: 'الوقت المنقضي', pause: 'إيقاف مؤقت', resume: 'استئناف', paused: 'التدريب متوقف مؤقتًا' }, ru: { elapsed: 'Прошло', pause: 'Пауза', resume: 'Продолжить', paused: 'Практика приостановлена' } } as const)[locale];
+  const clinicalCopy = ({
+    en: { keyInfo: 'Key info', attendingTip: 'Attending tip', labs: 'Labs', reviewAfterAnswer: 'Answer the question to review its explanation and key information.', noTip: 'No attending tip is available for this question.', noLabs: 'No question-specific laboratory values are available.', elapsed: 'Elapsed' },
+    ar: { keyInfo: 'معلومات أساسية', attendingTip: 'نصيحة الاستشاري', labs: 'المختبرات', reviewAfterAnswer: 'أجب عن السؤال لمراجعة الشرح والمعلومات الأساسية.', noTip: 'لا تتوفر نصيحة استشاري لهذا السؤال.', noLabs: 'لا توجد قيم مخبرية مرتبطة بهذا السؤال.', elapsed: 'المنقضي' },
+    he: { keyInfo: 'מידע מרכזי', attendingTip: 'טיפ מהמומחה', labs: 'בדיקות', reviewAfterAnswer: 'יש לענות על השאלה כדי לעיין בהסבר ובמידע המרכזי.', noTip: 'אין טיפ מומחה זמין לשאלה זו.', noLabs: 'אין ערכי מעבדה הקשורים לשאלה זו.', elapsed: 'זמן שחלף' },
+    ru: { keyInfo: 'Главное', attendingTip: 'Совет врача', labs: 'Анализы', reviewAfterAnswer: 'Ответьте на вопрос, чтобы просмотреть объяснение и ключевую информацию.', noTip: 'Для этого вопроса нет совета врача.', noLabs: 'Для этого вопроса нет связанных лабораторных значений.', elapsed: 'Прошло' },
+  } as const)[locale];
 
   const currentPosition = state?.session.current_position ?? 1;
   const isLast = currentPosition >= (state?.session.requested_count ?? 0);
@@ -154,7 +165,9 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       setQuestionStartedAt(Date.now());
       setConfidence(null);
       setKeyVisible(false);
+      setInfoTab('key-info');
       setFlashcardStatus('idle');
+      setIsSaved(nextState.question?.is_saved ?? false);
       setBreakRemaining(nextState.session.break_remaining_seconds);
       setQuestionRating(null);
       setReportOpen(false);
@@ -193,6 +206,9 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     const tick = () => {
       const wallElapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
       setRemaining(Math.max(0, total - wallElapsed));
+      const pausedNow = state.session.on_break && state.session.break_started_at
+        ? Math.max(0, Math.floor((Date.now() - new Date(state.session.break_started_at).getTime()) / 1000)) : 0;
+      setElapsedSeconds(Math.max(0, wallElapsed - state.session.break_seconds_used - pausedNow));
       if (state.session.mode === 'exam' && state.session.block_duration_minutes > 0 && !state.session.on_break) {
         const activeElapsed = Math.max(0, wallElapsed - state.session.break_seconds_used);
         const blockSeconds = state.session.block_duration_minutes * 60;
@@ -312,6 +328,24 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     const current = state?.items.find((item) => item.position === currentPosition)?.marked ?? false;
     void saveItemState(current, note);
   }, [currentPosition, note, saveItemState, state]);
+
+  const toggleSaved = useCallback(async () => {
+    const questionId = state?.question?.id;
+    if (!questionId || bookmarkBusy) return;
+    setBookmarkBusy(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/qbank/bookmarks', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ questionId, saved: !isSaved }),
+      });
+      const body = await readJson<ApiErrorBody>(response);
+      if (!response.ok) throw new Error(body.error ?? m.qbank.stateFailed);
+      setIsSaved(!isSaved);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : m.qbank.stateFailed);
+    } finally { setBookmarkBusy(false); }
+  }, [bookmarkBusy, isSaved, m.qbank.stateFailed, state?.question?.id]);
 
   const startBreak = useCallback(async () => {
     if (!state || state.session.mode !== 'exam' || state.session.on_break || state.session.break_remaining_seconds <= 0 || breakBusy || state.session.current_block <= 1 || (blockRemaining ?? 999) > 60) return;
@@ -530,7 +564,18 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     try {
       const response = await fetch('/api/qbank/annotations', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: crypto.randomUUID(), questionId: question.id, segmentKey: pendingAnnotation.segmentKey, ...pendingAnnotation.anchor, color: annotationColor, note: annotationNote.trim() || null }),
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          questionId: question.id,
+          segmentKey: pendingAnnotation.segmentKey,
+          quote: pendingAnnotation.anchor.quote,
+          prefix: pendingAnnotation.anchor.prefix,
+          suffix: pendingAnnotation.anchor.suffix,
+          startOffset: pendingAnnotation.anchor.start_offset,
+          endOffset: pendingAnnotation.anchor.end_offset,
+          color: annotationColor,
+          note: annotationNote.trim() || null,
+        }),
       });
       const body = await readJson<QuestionAnnotation & ApiErrorBody>(response);
       if (!response.ok) throw new Error(annotationCopy.saveError);
@@ -574,19 +619,20 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   }
 
   return (
-    <main className="page-shell" data-active-qbank-session>
-      <div className="page-head">
+    <main className="page-shell qbank-player" data-active-qbank-session>
+      <header className="page-head qbank-player-head">
         <div>
-          <div className="eyebrow">{state.session.exam_code} · {isExam ? m.qbank.examMode : m.qbank.practiceMode}</div>
-          <h1>{m.qbank.questionOf} {currentPosition} / {state.session.requested_count}</h1>
-          <p className="subtitle">{state.session.exam_name} · {m.qbank.blocks} {state.session.current_block}/{state.session.block_count}</p>
+          <div className="eyebrow">QUESTION BANK</div>
+          <h1>{m.qbank.questionOf} {String(currentPosition).padStart(2, '0')} / {String(state.session.requested_count).padStart(2, '0')}</h1>
+          <p className="subtitle">{state.session.exam_name} · {state.session.exam_code} · {isExam ? m.qbank.examMode : m.qbank.practiceMode} · {m.qbank.blocks} {state.session.current_block}/{state.session.block_count}</p>
         </div>
-        <div className="qbank-session-toolbar"><span className="qbank-shortcuts">1–9 answer · Enter submit · M mark · → next</span>
-          {isExam && remaining !== null && <span className="session-timer">{formatTime(remaining)}</span>}{!isExam && <span className="session-timer">{timerCopy.elapsed}: {formatTime(elapsedSeconds)}</span>}{isExam && blockRemaining !== null && !state.session.on_break && <span className="session-timer">{m.qbank.blockTime}: {formatTime(blockRemaining)}</span>}
-          {!isExam && <button className="btn" disabled={breakBusy} onClick={() => void togglePracticePause()} type="button">{state.session.on_break ? timerCopy.resume : timerCopy.pause}</button>}
-          <button className="btn btn-primary" disabled={saving} onClick={() => setConfirmFinish(true)} type="button">{m.qbank.finishSession}</button>
+        <div className="qbank-session-toolbar">
+          {(isExam ? remaining !== null : true) && <span className="session-timer"><Icon name="clock" size={18}/>{formatTime(isExam ? remaining ?? 0 : elapsedSeconds)}</span>}
+          {isExam && blockRemaining !== null && !state.session.on_break && <span className="session-timer qbank-block-timer">{m.qbank.blockTime}: {formatTime(blockRemaining)}</span>}
+          <button className="btn qbank-header-exit" disabled={saving} onClick={() => setConfirmFinish(true)} type="button"><Icon name="logout" size={18}/>{m.qbank.finishSession}</button>
         </div>
-      </div>
+      </header>
+      <div className="qbank-overall-progress" role="progressbar" aria-label={`${m.qbank.questionOf} ${currentPosition} / ${state.session.requested_count}`} aria-valuemin={0} aria-valuemax={state.session.requested_count} aria-valuenow={currentPosition}><span style={{ width: `${Math.min(100, (currentPosition / Math.max(1, state.session.requested_count)) * 100)}%` }}/></div>
 
       {error && <div className="form-message error">{error}</div>}
 
@@ -599,7 +645,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
 
       {!state.session.on_break && question && <section className="qbank-session-layout" onMouseUp={captureTextSelection} onTouchEnd={captureTextSelection} onKeyUp={captureTextSelection}>
         <div className="card card-pad question-card">
-          <div className="question-meta"><span>{question.subject}</span>{question.topic && <span>{question.topic}</span>}{question.reconstruction?.is_reconstruction && <span className="reconstruction-badge">{question.reconstruction.label} {question.reconstruction.year ?? ''}</span>}<span>{m.qbank.difficulty} {question.difficulty ?? '—'}/5</span></div>
+          <div className="qbank-question-top"><div className="question-meta"><span>{question.subject}</span>{question.topic && <span>{question.topic}</span>}{question.reconstruction?.is_reconstruction && <span className="reconstruction-badge">{question.reconstruction.label} {question.reconstruction.year ?? ''}</span>}<span className="qbank-difficulty-chip"><Icon name="chart" size={15}/>{m.qbank.difficulty} {question.difficulty ?? '—'}/5</span></div><button type="button" className={`qbank-bookmark-button${currentItem?.marked ? ' active' : ''}`} aria-label={currentItem?.marked ? m.qbank.unmark : m.qbank.markForReview} aria-pressed={Boolean(currentItem?.marked)} disabled={saving} onClick={() => toggleMark()}><Icon name="bookmark" size={22}/></button></div>
           <div className="question-stem"><AnnotationText text={question.stem} segmentKey="stem" annotations={questionAnnotations}/></div>
           {media.length > 0 && <div className="question-media">{media.map((asset) => {
             const src = asset.url || asset.external_url;
@@ -610,7 +656,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
               const answered = question.answered;
               const correct = answered && option.id === question.correct_answer;
               const wrongSelected = answered && option.id === selected && !question.is_correct;
-              return <button key={option.id} className={`answer-option${selected === option.id ? ' selected' : ''}${correct ? ' correct' : ''}${wrongSelected ? ' incorrect' : ''}`} disabled={answered || saving} onClick={() => setSelected(option.id)} type="button"><b>{option.id}</b><span><AnnotationText text={option.text} segmentKey={`option:${option.id}`} annotations={questionAnnotations}/></span></button>;
+              return <button key={option.id} className={`answer-option${selected === option.id ? ' selected' : ''}${correct ? ' correct' : ''}${wrongSelected ? ' incorrect' : ''}`} aria-pressed={selected === option.id} disabled={answered || saving} onClick={() => setSelected(option.id)} type="button"><b>{option.id}</b><span><AnnotationText text={option.text} segmentKey={`option:${option.id}`} annotations={questionAnnotations}/></span>{selected === option.id && <Icon name="check" size={19}/>}</button>;
             })}
           </div>
 
@@ -625,8 +671,6 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
           ) : (
             <div className={`answer-result ${question.is_correct ? 'answer-correct' : 'answer-wrong'}`}>
               <strong>{question.is_correct ? m.qbank.correct : m.qbank.incorrect}</strong>
-              {question.explanation && <p><AnnotationText text={question.explanation} segmentKey="explanation" annotations={questionAnnotations}/></p>}
-              {question.key_learning_point && <div className="learning-point"><b>{m.qbank.keyLearning}</b><span><AnnotationText text={question.key_learning_point} segmentKey="key_learning_point" annotations={questionAnnotations}/></span></div>}
             </div>
           )}
 
@@ -661,13 +705,32 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
             </section>}
             <textarea aria-label={m.qbank.note} value={note} onChange={(event) => setNote(event.target.value)} placeholder={m.qbank.notePlaceholder} />
             <div className="qbank-tool-row">
-              <button className={`btn${flashcardStatus === 'saved' ? ' btn-primary' : ''}`} disabled={flashcardStatus === 'saving' || flashcardStatus === 'saved'} onClick={() => void createFlashcardFromQuestion()} type="button">{flashcardStatus === 'saving' ? m.common.loading : flashcardStatus === 'saved' ? m.common.saved : m.qbank.addToFlashcards}</button>
-              <button className={`btn${currentItem?.marked ? ' btn-primary' : ''}`} disabled={saving} onClick={() => toggleMark()} type="button">{currentItem?.marked ? m.qbank.unmark : m.qbank.markForReview}</button>
-              <button className="btn" disabled={saving} onClick={() => saveNote()} type="button">{m.common.save}</button>
-              <button className="btn" disabled={!canSeeKeyTerms || question.key_terms.length === 0} onClick={() => setKeyVisible((visible) => !visible)} type="button">{m.qbank.keyTerms}</button>
+              <button className={`btn${flashcardStatus === 'saved' ? ' active' : ''}`} disabled={flashcardStatus === 'saving' || flashcardStatus === 'saved'} onClick={() => void createFlashcardFromQuestion()} type="button"><Icon name="cards" size={18}/>{flashcardStatus === 'saving' ? m.common.loading : flashcardStatus === 'saved' ? m.common.saved : m.qbank.addToFlashcards}</button>
+              <button className={`btn${currentItem?.marked ? ' active' : ''}`} disabled={saving} onClick={() => toggleMark()} type="button"><Icon name="flag" size={18}/>{currentItem?.marked ? m.qbank.unmark : m.qbank.markForReview}</button>
+              <button className={`btn${isSaved ? ' active' : ''}`} disabled={bookmarkBusy} aria-pressed={isSaved} onClick={() => void toggleSaved()} type="button"><Icon name="bookmark" size={18}/>{isSaved ? m.common.saved : m.common.save}</button>
+              <button className="btn" disabled={!canSeeKeyTerms || question.key_terms.length === 0} onClick={() => setKeyVisible((visible) => !visible)} type="button"><Icon name="search" size={18}/>{m.qbank.keyTerms}</button>
             </div>
             {flashcardStatus === 'error' && <span className="panel-sub">{m.qbank.couldNotCreate}</span>}
             {keyVisible && canSeeKeyTerms && question.key_terms.length > 0 && <div className="key-terms">{question.key_terms.slice(0, 3).map((term) => <span key={term}>{term}</span>)}</div>}
+            <div className="qbank-clinical-card">
+              <div className="qbank-clinical-tabs" role="tablist" aria-label="Question learning information">
+                <button id="qbank-tab-key-info" role="tab" aria-selected={infoTab === 'key-info'} aria-controls="qbank-panel-key-info" type="button" onClick={() => setInfoTab('key-info')}><Icon name="book" size={18}/>{clinicalCopy.keyInfo}</button>
+                <button id="qbank-tab-attending-tip" role="tab" aria-selected={infoTab === 'attending-tip'} aria-controls="qbank-panel-attending-tip" type="button" onClick={() => setInfoTab('attending-tip')}><Icon name="spark" size={18}/>{clinicalCopy.attendingTip}</button>
+                <button id="qbank-tab-labs" role="tab" aria-selected={infoTab === 'labs'} aria-controls="qbank-panel-labs" type="button" onClick={() => setInfoTab('labs')}><Icon name="flask" size={18}/>{clinicalCopy.labs}</button>
+              </div>
+              <div className="qbank-clinical-panel" id={`qbank-panel-${infoTab}`} role="tabpanel" aria-labelledby={`qbank-tab-${infoTab}`}>
+                {infoTab === 'key-info' && (hasAnswered && (question.explanation || question.key_learning_point) ? <div className="qbank-key-info">{question.explanation && <p><AnnotationText text={question.explanation} segmentKey="explanation" annotations={questionAnnotations}/></p>}{question.key_learning_point && <div className="learning-point"><b>{m.qbank.keyLearning}</b><span><AnnotationText text={question.key_learning_point} segmentKey="key_learning_point" annotations={questionAnnotations}/></span></div>}</div> : <div className="qbank-info-empty"><Icon name="book" size={19}/><span>{hasAnswered ? m.qbank.noQuestion : clinicalCopy.reviewAfterAnswer}</span></div>)}
+                {infoTab === 'attending-tip' && <div className="qbank-info-empty"><Icon name="spark" size={19}/><span>{clinicalCopy.noTip}</span></div>}
+                {infoTab === 'labs' && <div className="qbank-info-empty"><Icon name="flask" size={19}/><span>{clinicalCopy.noLabs}</span></div>}
+              </div>
+            </div>
+            <nav className="qbank-card-navigation" aria-label={m.qbank.navigator}>
+              <button className="btn" disabled={currentPosition <= 1 || saving} onClick={() => void load(currentPosition - 1)} type="button"><Icon name="chevron-left" size={17}/>{m.qbank.previous}</button>
+              <div className="qbank-card-pages" aria-label={`${m.qbank.questionOf} ${currentPosition} / ${state.session.requested_count}`}>
+                {state.items.filter((item) => state.items.length <= 9 || Math.abs(item.position - currentPosition) <= 3).map((item) => <button key={item.position} className={`qbank-page-dot${item.position === currentPosition ? ' current' : ''}${item.answered ? ' answered' : ''}`} aria-current={item.position === currentPosition ? 'step' : undefined} aria-label={`${m.qbank.questionOf} ${item.position}`} disabled={saving || (isExam && !state.session.previous_block_review_allowed && item.block !== state.session.current_block)} onClick={() => void load(item.position)} type="button">{item.position}</button>)}
+              </div>
+              <button className="btn btn-primary" disabled={isLast || saving} onClick={() => void load(currentPosition + 1)} type="button">{m.qbank.next}<Icon name="chevron-right" size={17}/></button>
+            </nav>
           </div>
         </div>
 
@@ -683,6 +746,13 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
           <div className="qbank-nav-footer"><button className="btn" disabled={currentPosition <= 1 || saving} onClick={() => void load(currentPosition - 1)}>{m.qbank.previous}</button><button className="btn btn-primary" disabled={isLast || saving} onClick={() => void load(currentPosition + 1)}>{m.qbank.next}</button></div>
         </aside>
       </section>}
+      <footer className="qbank-session-footer">
+        <div className="qbank-elapsed"><Icon name="clock" size={19}/><span>{timerCopy.elapsed}:&nbsp; {formatTime(elapsedSeconds)}</span></div>
+        <div className="qbank-footer-actions">
+          {!isExam && <button className="btn" disabled={breakBusy} onClick={() => void togglePracticePause()} type="button"><Icon name={state.session.on_break ? 'play' : 'pause'} size={17}/>{state.session.on_break ? timerCopy.resume : timerCopy.pause}</button>}
+          <button className="btn qbank-danger-action" disabled={saving} onClick={() => setConfirmFinish(true)} type="button"><Icon name="logout" size={17}/>{m.qbank.finishSession}</button>
+        </div>
+      </footer>
       {confirmFinish && <div className="qbank-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmFinish(false); }}>
         <section className="card card-pad qbank-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="qbank-finish-title" aria-describedby="qbank-finish-description" onKeyDown={(event) => { if (event.key === 'Escape') setConfirmFinish(false); }}>
           <h2 id="qbank-finish-title">{m.qbank.finishSession}?</h2>

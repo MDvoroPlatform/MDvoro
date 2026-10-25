@@ -16,7 +16,6 @@ const NAV_ITEMS = [
     ['/library', 'library', 'book'],
     ['/knowledge', 'knowledge', 'brain'],
     ['/notebook', 'notebook', 'bookmark'],
-    ['/lab-values', 'labValues', 'chart'],
     ['/settings', 'settings', 'settings'],
 ] as const;
 const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -115,7 +114,6 @@ function MobileNavDrawerPanel({ staff, userName }: { staff: boolean; userName?: 
           <div className="mobile-drawer-divider" />
           <div className="nav mobile-drawer-links">
             {NAV_ITEMS.slice(7, 10).map(([href, key, icon]) => <DrawerNavLink key={href} href={href} labelKey={key} icon={icon} onNavigate={() => setOpen(false)}/>)}
-            <DrawerNavLink href="/lab-values" labelKey="labValues" icon="chart" onNavigate={() => setOpen(false)}/>
           </div>
           <div className="mobile-drawer-divider" />
           <div className="nav mobile-drawer-links">
