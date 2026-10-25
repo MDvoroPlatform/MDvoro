@@ -1,10 +1,12 @@
 'use client';
 import Image from 'next/image';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type SyntheticEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n/provider';
+import { AnnotationText, type QuestionAnnotation } from '@/components/qbank/annotation-text';
+import { createTextAnchor, type AnnotationAnchor } from '@/lib/qbank/annotation-anchor';
 
 type SessionItem = {
   position: number;
@@ -98,12 +100,21 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [confidence, setConfidence] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [flashcardStatus, setFlashcardStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [annotations, setAnnotations] = useState<QuestionAnnotation[]>([]);
+  const [pendingAnnotation, setPendingAnnotation] = useState<{ segmentKey: string; anchor: AnnotationAnchor } | null>(null);
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  const [annotationNote, setAnnotationNote] = useState('');
+  const [annotationColor, setAnnotationColor] = useState<QuestionAnnotation['color']>('yellow');
+  const [annotationBusy, setAnnotationBusy] = useState(false);
+  const [annotationError, setAnnotationError] = useState('');
 
   const currentPosition = state?.session.current_position ?? 1;
   const isLast = currentPosition >= (state?.session.requested_count ?? 0);
   const isExam = state?.session.mode === 'exam';
   const hasAnswered = state?.question?.answered ?? false;
   const canSeeKeyTerms = !isExam || hasAnswered;
+  const questionAnnotations = annotations.filter((annotation) => annotation.question_id === state?.question?.id);
+  const activeAnnotation = questionAnnotations.find((annotation) => annotation.id === activeAnnotationId) ?? null;
 
   const load = useCallback(async (position = 0) => {
     try {
@@ -121,6 +132,10 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       }
       const nextState = body as SessionState;
       setError(null);
+      setAnnotations([]);
+      setPendingAnnotation(null);
+      setActiveAnnotationId(null);
+      setAnnotationError('');
       setState(nextState);
       setSelected(nextState.question?.selected_answer ?? null);
       setNote(nextState.question?.note ?? '');
@@ -358,6 +373,26 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     he: 'לסיים את המפגש עכשיו? התשובות וההתקדמות שנשמרו יישארו זמינות.',
     ru: 'Завершить сессию сейчас? Записанные ответы и прогресс будут сохранены.',
   }[locale] ?? 'Finish this session now? Your recorded answers and progress will be saved.';
+  const annotationCopy = {
+    en: { title: 'Private highlights', help: 'Select text in the question, choices, or explanation to highlight it.', note: 'Private note for this passage', placeholder: 'Add a note about this passage…', save: 'Save highlight', saveNote: 'Save note', remove: 'Remove highlight', cancel: 'Cancel', loadError: 'Could not load private highlights.', saveError: 'Could not save this highlight.', updateError: 'Could not update this highlight.', deleteError: 'Could not remove this highlight.', colors: { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink', orange: 'Orange' } },
+    ar: { title: 'التظليلات الخاصة', help: 'حدد نصًا من السؤال أو الخيارات أو الشرح لتظليله.', note: 'ملاحظة خاصة لهذا المقطع', placeholder: 'أضف ملاحظة لهذا المقطع…', save: 'حفظ التظليل', saveNote: 'حفظ الملاحظة', remove: 'حذف التظليل', cancel: 'إلغاء', loadError: 'تعذر تحميل التظليلات الخاصة.', saveError: 'تعذر حفظ هذا التظليل.', updateError: 'تعذر تعديل هذا التظليل.', deleteError: 'تعذر حذف هذا التظليل.', colors: { yellow: 'أصفر', green: 'أخضر', blue: 'أزرق', pink: 'وردي', orange: 'برتقالي' } },
+    he: { title: 'הדגשות פרטיות', help: 'בחרו טקסט בשאלה, בתשובות או בהסבר כדי להדגיש אותו.', note: 'הערה פרטית לקטע הזה', placeholder: 'הוסיפו הערה לקטע…', save: 'שמירת הדגשה', saveNote: 'שמירת הערה', remove: 'הסרת הדגשה', cancel: 'ביטול', loadError: 'לא ניתן לטעון הדגשות פרטיות.', saveError: 'לא ניתן לשמור את ההדגשה.', updateError: 'לא ניתן לעדכן את ההדגשה.', deleteError: 'לא ניתן להסיר את ההדגשה.', colors: { yellow: 'צהוב', green: 'ירוק', blue: 'כחול', pink: 'ורוד', orange: 'כתום' } },
+    ru: { title: 'Личные выделения', help: 'Выделите текст вопроса, вариантов или объяснения.', note: 'Личная заметка к этому фрагменту', placeholder: 'Добавьте заметку к фрагменту…', save: 'Сохранить выделение', saveNote: 'Сохранить заметку', remove: 'Удалить выделение', cancel: 'Отмена', loadError: 'Не удалось загрузить личные выделения.', saveError: 'Не удалось сохранить выделение.', updateError: 'Не удалось изменить выделение.', deleteError: 'Не удалось удалить выделение.', colors: { yellow: 'Жёлтый', green: 'Зелёный', blue: 'Синий', pink: 'Розовый', orange: 'Оранжевый' } },
+  }[locale] ?? { title: 'Private highlights', help: 'Select text in the question, choices, or explanation to highlight it.', note: 'Private note for this passage', placeholder: 'Add a note about this passage…', save: 'Save highlight', saveNote: 'Save note', remove: 'Remove highlight', cancel: 'Cancel', loadError: 'Could not load private highlights.', saveError: 'Could not save this highlight.', updateError: 'Could not update this highlight.', deleteError: 'Could not remove this highlight.', colors: { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink', orange: 'Orange' } };
+
+  useEffect(() => {
+    const questionId = state?.question?.id;
+    if (!questionId) return;
+    let current = true;
+    void fetch(`/api/qbank/annotations?questionId=${encodeURIComponent(questionId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const body = await readJson<QuestionAnnotation[] | ApiErrorBody>(response);
+        if (!response.ok) throw new Error(annotationCopy.loadError);
+        if (current && Array.isArray(body)) setAnnotations(body);
+      })
+      .catch((cause) => { if (current) setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.loadError); });
+    return () => { current = false; };
+  }, [annotationCopy.loadError, state?.question?.id]);
 
   const media = useMemo(() => [...(state?.question?.media ?? [])].sort((a, b) => a.position - b.position), [state?.question?.media]);
 
@@ -367,6 +402,80 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const question = state.question;
 
   const currentItem = state.items.find((item) => item.position === currentPosition);
+  function captureTextSelection(event: SyntheticEvent<HTMLElement>) {
+    const eventTarget = event.target;
+    if (eventTarget instanceof Element && eventTarget.closest('.qbank-annotations,button,input,textarea,select,[role="dialog"]')) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) return;
+    const range = selection.getRangeAt(0);
+    const node = range.commonAncestorContainer;
+    const element = node instanceof Element ? node : node.parentElement;
+    const surface = element?.closest<HTMLElement>('[data-annotation-segment]');
+    if (!surface || !surface.contains(range.startContainer) || !surface.contains(range.endContainer)) return;
+    const text = surface.textContent ?? '';
+    const startRange = range.cloneRange();
+    startRange.selectNodeContents(surface);
+    startRange.setEnd(range.startContainer, range.startOffset);
+    const start = startRange.toString().length;
+    const selectedText = range.toString();
+    const anchor = createTextAnchor(text, start, start + selectedText.length);
+    if (!anchor || text.slice(start, start + selectedText.length) !== selectedText) return;
+    setActiveAnnotationId(null);
+    setAnnotationNote('');
+    setAnnotationColor('yellow');
+    setPendingAnnotation({ segmentKey: surface.dataset.annotationSegment ?? 'stem', anchor });
+    setAnnotationError('');
+  }
+
+  async function saveNewAnnotation() {
+    if (!pendingAnnotation || !question || annotationBusy) return;
+    setAnnotationBusy(true);
+    setAnnotationError('');
+    try {
+      const response = await fetch('/api/qbank/annotations', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: crypto.randomUUID(), questionId: question.id, segmentKey: pendingAnnotation.segmentKey, ...pendingAnnotation.anchor, color: annotationColor, note: annotationNote.trim() || null }),
+      });
+      const body = await readJson<QuestionAnnotation & ApiErrorBody>(response);
+      if (!response.ok) throw new Error(annotationCopy.saveError);
+      setAnnotations((current) => [...current.filter((annotation) => annotation.id !== body.id), body]);
+      setActiveAnnotationId(body.id);
+      setPendingAnnotation(null);
+      window.getSelection()?.removeAllRanges();
+    } catch (cause) {
+      setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.saveError);
+    } finally { setAnnotationBusy(false); }
+  }
+
+  async function updateActiveAnnotation(patch: { color?: QuestionAnnotation['color']; note?: string | null }) {
+    if (!activeAnnotation || annotationBusy) return;
+    setAnnotationBusy(true);
+    setAnnotationError('');
+    try {
+      const response = await fetch('/api/qbank/annotations', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: activeAnnotation.id, ...patch }) });
+      const body = await readJson<QuestionAnnotation & ApiErrorBody>(response);
+      if (!response.ok) throw new Error(annotationCopy.updateError);
+      setAnnotations((current) => current.map((annotation) => annotation.id === body.id ? body : annotation));
+      if (patch.note !== undefined) setAnnotationNote(body.note ?? '');
+    } catch (cause) {
+      setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.updateError);
+    } finally { setAnnotationBusy(false); }
+  }
+
+  async function deleteActiveAnnotation() {
+    if (!activeAnnotation || annotationBusy) return;
+    setAnnotationBusy(true);
+    setAnnotationError('');
+    try {
+      const response = await fetch('/api/qbank/annotations', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: activeAnnotation.id }) });
+      if (!response.ok) throw new Error(annotationCopy.deleteError);
+      setAnnotations((current) => current.filter((annotation) => annotation.id !== activeAnnotation.id));
+      setActiveAnnotationId(null);
+      setAnnotationNote('');
+    } catch (cause) {
+      setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.deleteError);
+    } finally { setAnnotationBusy(false); }
+  }
 
   return (
     <main className="page-shell" data-active-qbank-session>
@@ -391,10 +500,10 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         <div className="break-panel"><div><strong>{m.qbank.onBreak}</strong><div className="panel-sub">{m.qbank.breakRemaining}: {formatTime(breakRemaining)}</div></div><button className="btn btn-primary" disabled={breakBusy || breakRemaining <= 0} onClick={() => void endBreak()} type="button">{m.qbank.resumeExam}</button></div>
       )}
 
-      {!state.session.on_break && question && <section className="qbank-session-layout">
+      {!state.session.on_break && question && <section className="qbank-session-layout" onMouseUp={captureTextSelection} onTouchEnd={captureTextSelection} onKeyUp={captureTextSelection}>
         <div className="card card-pad question-card">
           <div className="question-meta"><span>{question.subject}</span>{question.topic && <span>{question.topic}</span>}{question.reconstruction?.is_reconstruction && <span className="reconstruction-badge">{question.reconstruction.label} {question.reconstruction.year ?? ''}</span>}<span>{m.qbank.difficulty} {question.difficulty ?? '—'}/5</span></div>
-          <div className="question-stem">{question.stem}</div>
+          <div className="question-stem"><AnnotationText text={question.stem} segmentKey="stem" annotations={questionAnnotations}/></div>
           {media.length > 0 && <div className="question-media">{media.map((asset) => {
             const src = asset.url || asset.external_url;
             return src ? <figure key={asset.id}><Image src={src} alt={asset.alt_text} width={1200} height={800} unoptimized loading="lazy" decoding="async" referrerPolicy="no-referrer"/><figcaption>{asset.caption}</figcaption></figure> : null;
@@ -404,7 +513,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
               const answered = question.answered;
               const correct = answered && option.id === question.correct_answer;
               const wrongSelected = answered && option.id === selected && !question.is_correct;
-              return <button key={option.id} className={`answer-option${selected === option.id ? ' selected' : ''}${correct ? ' correct' : ''}${wrongSelected ? ' incorrect' : ''}`} disabled={answered || saving} onClick={() => setSelected(option.id)} type="button"><b>{option.id}</b><span>{option.text}</span></button>;
+              return <button key={option.id} className={`answer-option${selected === option.id ? ' selected' : ''}${correct ? ' correct' : ''}${wrongSelected ? ' incorrect' : ''}`} disabled={answered || saving} onClick={() => setSelected(option.id)} type="button"><b>{option.id}</b><span><AnnotationText text={option.text} segmentKey={`option:${option.id}`} annotations={questionAnnotations}/></span></button>;
             })}
           </div>
 
@@ -419,12 +528,29 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
           ) : (
             <div className={`answer-result ${question.is_correct ? 'answer-correct' : 'answer-wrong'}`}>
               <strong>{question.is_correct ? m.qbank.correct : m.qbank.incorrect}</strong>
-              {question.explanation && <p>{question.explanation}</p>}
-              {question.key_learning_point && <div className="learning-point"><b>{m.qbank.keyLearning}</b><span>{question.key_learning_point}</span></div>}
+              {question.explanation && <p><AnnotationText text={question.explanation} segmentKey="explanation" annotations={questionAnnotations}/></p>}
+              {question.key_learning_point && <div className="learning-point"><b>{m.qbank.keyLearning}</b><span><AnnotationText text={question.key_learning_point} segmentKey="key_learning_point" annotations={questionAnnotations}/></span></div>}
             </div>
           )}
 
           <div className="question-actions qbank-session-tools">
+            <section className="qbank-annotations" aria-label="Private question highlights">
+              <div className="panel-head"><div><div className="panel-title">{annotationCopy.title}</div><div className="panel-sub">{annotationCopy.help}</div></div><span className="qbank-annotation-count">{questionAnnotations.length}</span></div>
+              {questionAnnotations.length > 0 && <div className="qbank-annotation-list">{questionAnnotations.map((annotation) => <button key={annotation.id} type="button" className={`qbank-annotation-chip annotation-${annotation.color}${activeAnnotationId === annotation.id ? ' active' : ''}`} aria-pressed={activeAnnotationId === annotation.id} onClick={() => { setPendingAnnotation(null); setActiveAnnotationId(annotation.id); setAnnotationNote(annotation.note ?? ''); setAnnotationColor(annotation.color); }}><span>{annotation.quote}</span>{annotation.note && <small>{annotation.note}</small>}</button>)}</div>}
+              {(pendingAnnotation || activeAnnotation) && <div className="qbank-annotation-editor">
+                {pendingAnnotation && <p className="qbank-annotation-quote">“{pendingAnnotation.anchor.quote}”</p>}
+                <label className="field"><span>{annotationCopy.note}</span><textarea rows={2} maxLength={1000} value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} placeholder={annotationCopy.placeholder}/></label>
+                <div className="qbank-annotation-colors" role="group" aria-label="Highlight color">
+                  {(['yellow','green','blue','pink','orange'] as const).map((color) => <button key={color} className={`qbank-color-choice annotation-${color}${annotationColor === color ? ' active' : ''}`} type="button" aria-label={`${annotationCopy.colors[color]} highlight`} title={annotationCopy.colors[color]} aria-pressed={annotationColor === color} disabled={annotationBusy} onClick={() => { setAnnotationColor(color); if (activeAnnotation) void updateActiveAnnotation({ color }); }}/>) }
+                </div>
+                <div className="qbank-annotation-actions">
+                  {pendingAnnotation && <button className="btn btn-primary" type="button" disabled={annotationBusy} onClick={() => void saveNewAnnotation()}>{annotationBusy ? m.common.loading : annotationCopy.save}</button>}
+                  {activeAnnotation && <><button className="btn btn-primary" type="button" disabled={annotationBusy || annotationNote === (activeAnnotation.note ?? '')} onClick={() => void updateActiveAnnotation({ note: annotationNote.trim() || null })}>{annotationBusy ? m.common.loading : annotationCopy.saveNote}</button><button className="btn" type="button" disabled={annotationBusy} onClick={() => void deleteActiveAnnotation()}>{annotationCopy.remove}</button></>}
+                  <button className="btn" type="button" disabled={annotationBusy} onClick={() => { setPendingAnnotation(null); setActiveAnnotationId(null); setAnnotationNote(''); }}>{annotationCopy.cancel}</button>
+                </div>
+              </div>}
+              {annotationError && <p className="qbank-annotation-error" role="status">{annotationError}</p>}
+            </section>
             <textarea aria-label={m.qbank.note} value={note} onChange={(event) => setNote(event.target.value)} placeholder={m.qbank.notePlaceholder} />
             <div className="qbank-tool-row">
               <button className={`btn${flashcardStatus === 'saved' ? ' btn-primary' : ''}`} disabled={flashcardStatus === 'saving' || flashcardStatus === 'saved'} onClick={() => void createFlashcardFromQuestion()} type="button">{flashcardStatus === 'saving' ? m.common.loading : flashcardStatus === 'saved' ? m.common.saved : m.qbank.addToFlashcards}</button>

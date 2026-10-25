@@ -27,6 +27,12 @@ begin
       or not has_function_privilege('authenticated','public.submit_question_answer(uuid,text,integer,smallint,uuid)','EXECUTE') then raise exception 'current submit_question_answer signature missing'; end if;
   if not has_function_privilege('authenticated','public.set_question_taxonomy(uuid,uuid[])','EXECUTE') then raise exception 'taxonomy RPC missing'; end if;
   if not exists(select 1 from pg_indexes where schemaname='public' and indexname='taxonomy_nodes_root_slug_uidx') then raise exception 'root taxonomy uniqueness index missing'; end if;
+  if to_regclass('public.question_annotations') is not null then
+    select relrowsecurity into v from pg_class where oid='public.question_annotations'::regclass;
+    if not v then raise exception 'question annotation RLS is disabled'; end if;
+    if has_table_privilege('anon','public.question_annotations','SELECT') then raise exception 'anon can read private question annotations'; end if;
+    if pg_get_functiondef('public.consume_rate_limit(text,integer,integer)'::regprocedure) not ilike '%qbank_annotation%' then raise exception 'annotation rate limit action missing'; end if;
+  end if;
 end $$;
 
 -- Every SECURITY DEFINER function in public must pin an empty search_path.
