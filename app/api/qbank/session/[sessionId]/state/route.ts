@@ -4,6 +4,11 @@ import { sessionStateSchema } from '@/lib/validation/qbank';
 import { apiError, assertMutationRequest, readJson, enforceRateLimit } from '@/lib/server/api';
 export async function GET(_request:Request,{params}:{params:Promise<{sessionId:string}>}){try{const {sessionId}=await params;const url=new URL(_request.url);const position=Number(url.searchParams.get('position')??'1');const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)return NextResponse.json({error:'unauthorized'},{status:401});const {data,error}=await supabase.rpc('get_study_session_state',{p_session_id:sessionId,p_position:position});if(error){const code=error.message.includes('block_closed')?'block_closed':error.message.includes('block_not_open')?'block_not_open':error.message.includes('session_expired')?'session_expired':error.message.includes('on_break')?'on_break':'session_not_found';const status=code==='session_expired'?410:code==='session_not_found'?404:409;return NextResponse.json({error:code},{status});}
     const question=data?.question;
+    if(question?.id){
+      const {data:bookmark,error:bookmarkError}=await supabase.from('question_bookmarks').select('question_id').eq('user_id',user.id).eq('question_id',question.id).maybeSingle();
+      if(bookmarkError) throw bookmarkError;
+      question.is_saved=Boolean(bookmark);
+    }
     if(question&&Array.isArray(question.media)){
         const {data:storedMedia,error:mediaError}=await supabase.rpc('get_study_session_media_paths',{p_session_id:sessionId,p_position:data.session.current_position});
         if(mediaError) throw mediaError;

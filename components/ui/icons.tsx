@@ -4,7 +4,7 @@ type IconProps = {
 };
 const base = (p: IconProps) => ({ width: p.size ?? 18, height: p.size ?? 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: p.stroke ?? 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true });
 export function Icon({ name, ...p }: IconProps & {
-    name: 'grid' | 'book' | 'cards' | 'calendar' | 'chart' | 'settings' | 'search' | 'bell' | 'arrow' | 'chevron-left' | 'chevron-right' | 'user' | 'target' | 'brain' | 'check' | 'shield' | 'logout' | 'plus' | 'clock' | 'spark' | 'eye' | 'globe' | 'moon' | 'sun' | 'bookmark' | 'trophy' | 'menu' | 'mail' | 'lock' | 'graduation' | 'trending' | 'trend-up';
+    name: 'grid' | 'book' | 'cards' | 'calendar' | 'chart' | 'settings' | 'search' | 'bell' | 'arrow' | 'chevron-left' | 'chevron-right' | 'user' | 'target' | 'brain' | 'check' | 'shield' | 'logout' | 'plus' | 'clock' | 'spark' | 'eye' | 'globe' | 'moon' | 'sun' | 'bookmark' | 'trophy' | 'menu' | 'mail' | 'lock' | 'graduation' | 'trending' | 'trend-up' | 'flag' | 'flask' | 'play' | 'pause';
 }) {
     const a = base(p);
     const paths: Record<string, React.ReactNode> = {
@@ -38,6 +38,10 @@ export function Icon({ name, ...p }: IconProps & {
         graduation: <><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c3.5 3 8.5 3 12 0v-5M22 9v6"/></>,
         trending: <><path d="M3 17 9 11l4 4 8-9"/><path d="M15 6h6v6"/></>,
         'trend-up': <><path d="m4 16 6-6 4 3 6-7"/><path d="M15 6h5v5"/></>,
+        flag: <><path d="M5 21V5"/><path d="M5 5c5-4 9 4 14 0v10c-5 4-9-4-14 0"/></>,
+        flask: <><path d="M9 3h6M10 3v6l-5.2 9.1A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-2.9L14 9V3"/><path d="M8 15h8"/></>,
+        play: <path d="m8 5 11 7-11 7z"/>,
+        pause: <><path d="M8 5v14M16 5v14"/></>,
         moon: <><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5a8.5 8.5 0 1 0 12 12z"/></>,
         sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>
     };
