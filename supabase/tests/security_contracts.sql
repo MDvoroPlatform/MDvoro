@@ -59,6 +59,10 @@ begin
     if not has_function_privilege('authenticated','public.resume_practice_session(uuid)','EXECUTE') then raise exception 'practice resume RPC missing'; end if;
     if has_function_privilege('anon','public.pause_practice_session(uuid)','EXECUTE') then raise exception 'anon can pause practice sessions'; end if;
   end if;
+  if to_regprocedure('public.list_my_qbank_library(integer)') is not null then
+    if not has_function_privilege('authenticated','public.list_my_qbank_library(integer)','EXECUTE') then raise exception 'personal QBank library RPC missing'; end if;
+    if has_function_privilege('anon','public.list_my_qbank_library(integer)','EXECUTE') then raise exception 'anon can read personal QBank library'; end if;
+  end if;
 end $$;
 
 -- Every SECURITY DEFINER function in public must pin an empty search_path.
