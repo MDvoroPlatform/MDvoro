@@ -370,7 +370,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   }, [blockRemaining, breakBusy, currentPosition, load, m.qbank.breakUnavailable, sessionId, state]);
 
   const endBreak = useCallback(async () => {
-    if (!state?.session.on_break || breakBusy) return;
+    if (state?.session.mode !== 'exam' || !state.session.on_break || breakBusy) return;
     setBreakBusy(true);
     setError(null);
     try {
@@ -476,10 +476,10 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   }, [answer, currentPosition, isLast, load, saving, selected, state, toggleMark]);
 
   useEffect(() => {
-    if (!state?.session.on_break || breakRemaining > 0 || breakBusy) return;
+    if (state?.session.mode !== 'exam' || !state.session.on_break || breakRemaining > 0 || breakBusy) return;
     const timer = window.setTimeout(() => void endBreak(), 0);
     return () => window.clearTimeout(timer);
-  }, [breakBusy, breakRemaining, endBreak, state?.session.on_break]);
+  }, [breakBusy, breakRemaining, endBreak, state?.session.mode, state?.session.on_break]);
 
   const finish = useCallback(async () => {
     if (!state || saving) return;
