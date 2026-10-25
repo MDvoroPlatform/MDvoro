@@ -10,6 +10,19 @@ export const adminQbankQuestionReportUpdateSchema = z.object({
   status: z.enum(['open','in_review','resolved','dismissed']),
   note: z.string().trim().max(2000).default(''),
 });
+export const adminLabValueSchema = z.object({
+  id: z.string().uuid().nullable().default(null),
+  name: z.string().trim().min(1).max(160),
+  category: z.enum(['hematology','electrolytes','renal','liver','endocrine','other']),
+  referenceRange: z.string().trim().min(1).max(240),
+  unit: z.string().trim().min(1).max(40),
+  siReferenceRange: z.string().trim().min(1).max(240),
+  siUnit: z.string().trim().min(1).max(40),
+  population: z.string().trim().min(1).max(120).default('Adult'),
+  sourceReference: z.string().trim().min(8).max(1000),
+  reviewNote: z.string().trim().max(1000).default(''),
+  status: z.enum(['pending','in_review','approved','archived']).default('pending'),
+});
 export const startSessionSchema = z.object({
   examId: z.string().uuid(),
   subjects: z.array(z.string().trim().min(1).max(120)).max(20).default([]),

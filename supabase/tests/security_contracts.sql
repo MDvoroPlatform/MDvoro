@@ -46,6 +46,14 @@ begin
     if not has_function_privilege('authenticated','public.admin_update_qbank_question_report(uuid,text,text)','EXECUTE') then raise exception 'admin QBank report update RPC missing'; end if;
     if pg_get_functiondef('public.consume_rate_limit(text,integer,integer)'::regprocedure) not ilike '%qbank_feedback%' then raise exception 'QBank feedback rate limit action missing'; end if;
   end if;
+  if to_regclass('public.lab_values') is not null then
+    select relrowsecurity into v from pg_class where oid='public.lab_values'::regclass;
+    if not v then raise exception 'lab values RLS is disabled'; end if;
+    if has_table_privilege('anon','public.lab_values','SELECT') then raise exception 'anon can read clinical lab reference values'; end if;
+    if has_table_privilege('authenticated','public.lab_values','INSERT') then raise exception 'authenticated can write clinical lab values directly'; end if;
+    if not has_function_privilege('authenticated','public.admin_list_lab_values(text)','EXECUTE') then raise exception 'admin lab values review RPC missing'; end if;
+    if not has_function_privilege('authenticated','public.admin_upsert_lab_value(uuid,text,text,text,text,text,text,text,text,text,text)','EXECUTE') then raise exception 'admin lab values write RPC missing'; end if;
+  end if;
 end $$;
 
 -- Every SECURITY DEFINER function in public must pin an empty search_path.

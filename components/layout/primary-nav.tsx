@@ -16,13 +16,16 @@ const NAV_ITEMS = [
     ['/library', 'library', 'book'],
     ['/knowledge', 'knowledge', 'brain'],
     ['/notebook', 'notebook', 'bookmark'],
+    ['/lab-values', 'labValues', 'chart'],
     ['/settings', 'settings', 'settings'],
 ] as const;
 const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
 function NavLinks({ staff, onNavigate }: { staff: boolean; onNavigate?: () => void }) {
     const pathname = usePathname();
     const { messages, locale } = useI18n();
-    const labelFor = (key: string) => key === 'notebook'
+    const labelFor = (key: string) => key === 'labValues'
+        ? ({ en: 'Lab Values', he: 'ערכי מעבדה', ar: 'القيم المخبرية', ru: 'Лабораторные показатели' } as const)[locale]
+        : key === 'notebook'
         ? ({ en: 'Notebook', he: 'מחברת', ar: 'مذكرتي', ru: 'Блокнот' } as const)[locale]
         : key === 'examGuide'
             ? ({ en: 'Exam Guide', he: 'מדריך הבחינה', ar: 'دليل الامتحان', ru: 'Гид по экзамену' } as const)[locale]
@@ -112,6 +115,7 @@ function MobileNavDrawerPanel({ staff, userName }: { staff: boolean; userName?: 
           <div className="mobile-drawer-divider" />
           <div className="nav mobile-drawer-links">
             {NAV_ITEMS.slice(7, 10).map(([href, key, icon]) => <DrawerNavLink key={href} href={href} labelKey={key} icon={icon} onNavigate={() => setOpen(false)}/>)}
+            <DrawerNavLink href="/lab-values" labelKey="labValues" icon="chart" onNavigate={() => setOpen(false)}/>
           </div>
           <div className="mobile-drawer-divider" />
           <div className="nav mobile-drawer-links">
@@ -133,7 +137,9 @@ function DrawerNavLink({ href, labelKey, icon, onNavigate }: { href: typeof NAV_
     const pathname = usePathname();
     const { messages, locale } = useI18n();
     const active = isActive(pathname, href);
-    const label = labelKey === 'notebook'
+    const label = labelKey === 'labValues'
+        ? ({ en: 'Lab Values', he: 'ערכי מעבדה', ar: 'القيم المخبرية', ru: 'Лабораторные показатели' } as const)[locale]
+        : labelKey === 'notebook'
         ? ({ en: 'Notebook', he: 'מחברת', ar: 'مذكرتي', ru: 'Блокнот' } as const)[locale]
         : labelKey === 'examGuide'
             ? ({ en: 'Exam Guide', he: 'מדריך הבחינה', ar: 'دليل الامتحان', ru: 'Гид по экзамену' } as const)[locale]
