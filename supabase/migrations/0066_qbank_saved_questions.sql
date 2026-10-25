@@ -28,3 +28,5 @@ $$;
 
 revoke all on function public.set_question_bookmark(uuid, boolean) from public, anon;
 grant execute on function public.set_question_bookmark(uuid, boolean) to authenticated;
+-- The table's SELECT RLS policy limits reads to the current user's bookmarks.
+grant select on table public.question_bookmarks to authenticated;
