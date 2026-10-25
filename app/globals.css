@@ -1489,3 +1489,6 @@ html.dark .topbar,html[data-theme="dark"] .topbar,html.dark .mobile-nav,html[dat
   .topbar-tools{display:flex!important;flex:0 0 auto;margin-inline-start:auto!important}
   .topbar-tools .notification-bell{width:36px;height:36px}
 }
+/* Private passage annotations in the searchable notebook. */
+.notebook-highlight{margin:0;padding:12px;border:1px solid var(--line);border-radius:12px;color:var(--ink);line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.notebook-highlight.annotation-yellow{background:#fff0a8}.notebook-highlight.annotation-green{background:#c9f1d3}.notebook-highlight.annotation-blue{background:#cfe2ff}.notebook-highlight.annotation-pink{background:#f8d3e4}.notebook-highlight.annotation-orange{background:#ffddbf}
