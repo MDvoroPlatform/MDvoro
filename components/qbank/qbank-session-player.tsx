@@ -1,7 +1,7 @@
 'use client';
 import Image from 'next/image';
 
-import { useCallback, useEffect, useMemo, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type SyntheticEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n/provider';
@@ -66,6 +66,7 @@ type SessionState = {
 
 type ApiErrorBody = { error?: string };
 type AnswerResponse = { already_answered?: boolean; is_correct?: boolean; selected_answer?: string | null; error?: string };
+type IssueCategory = 'incorrect_answer' | 'typo' | 'unclear' | 'outdated' | 'other';
 
 function formatTime(totalSeconds: number): string {
   const safe = Math.max(0, totalSeconds);
@@ -107,6 +108,14 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [annotationColor, setAnnotationColor] = useState<QuestionAnnotation['color']>('yellow');
   const [annotationBusy, setAnnotationBusy] = useState(false);
   const [annotationError, setAnnotationError] = useState('');
+  const [questionRating, setQuestionRating] = useState<number | null>(null);
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCategory, setReportCategory] = useState<IssueCategory>('incorrect_answer');
+  const [reportMessage, setReportMessage] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
 
   const currentPosition = state?.session.current_position ?? 1;
   const isLast = currentPosition >= (state?.session.requested_count ?? 0);
@@ -144,6 +153,11 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       setKeyVisible(false);
       setFlashcardStatus('idle');
       setBreakRemaining(nextState.session.break_remaining_seconds);
+      setQuestionRating(null);
+      setReportOpen(false);
+      setReportMessage('');
+      setReportSubmitted(false);
+      setFeedbackMessage('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : m.common.error);
     } finally {
@@ -379,6 +393,12 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     he: { title: 'הדגשות פרטיות', help: 'בחרו טקסט בשאלה, בתשובות או בהסבר כדי להדגיש אותו.', note: 'הערה פרטית לקטע הזה', placeholder: 'הוסיפו הערה לקטע…', save: 'שמירת הדגשה', saveNote: 'שמירת הערה', remove: 'הסרת הדגשה', cancel: 'ביטול', loadError: 'לא ניתן לטעון הדגשות פרטיות.', saveError: 'לא ניתן לשמור את ההדגשה.', updateError: 'לא ניתן לעדכן את ההדגשה.', deleteError: 'לא ניתן להסיר את ההדגשה.', colors: { yellow: 'צהוב', green: 'ירוק', blue: 'כחול', pink: 'ורוד', orange: 'כתום' } },
     ru: { title: 'Личные выделения', help: 'Выделите текст вопроса, вариантов или объяснения.', note: 'Личная заметка к этому фрагменту', placeholder: 'Добавьте заметку к фрагменту…', save: 'Сохранить выделение', saveNote: 'Сохранить заметку', remove: 'Удалить выделение', cancel: 'Отмена', loadError: 'Не удалось загрузить личные выделения.', saveError: 'Не удалось сохранить выделение.', updateError: 'Не удалось изменить выделение.', deleteError: 'Не удалось удалить выделение.', colors: { yellow: 'Жёлтый', green: 'Зелёный', blue: 'Синий', pink: 'Розовый', orange: 'Оранжевый' } },
   }[locale] ?? { title: 'Private highlights', help: 'Select text in the question, choices, or explanation to highlight it.', note: 'Private note for this passage', placeholder: 'Add a note about this passage…', save: 'Save highlight', saveNote: 'Save note', remove: 'Remove highlight', cancel: 'Cancel', loadError: 'Could not load private highlights.', saveError: 'Could not save this highlight.', updateError: 'Could not update this highlight.', deleteError: 'Could not remove this highlight.', colors: { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink', orange: 'Orange' } };
+  const feedbackCopy = {
+    en: { rate: 'How useful was this question?', rated: 'Thanks for rating this question.', report: 'Report a problem', reportSent: 'Report submitted. Thank you for helping improve the bank.', category: 'Problem type', message: 'Details (optional)', placeholder: 'Describe the problem briefly…', noPatient: 'Please do not include patient or personal information.', submit: 'Send report', cancel: 'Cancel', ratingError: 'Could not save your rating.', reportError: 'Could not submit your report.', categories: { incorrect_answer: 'Incorrect answer or explanation', typo: 'Typo', unclear: 'Unclear wording', outdated: 'Outdated information', other: 'Other' } },
+    ar: { rate: 'ما مدى فائدة هذا السؤال؟', rated: 'شكرًا لتقييم السؤال.', report: 'الإبلاغ عن مشكلة', reportSent: 'تم إرسال البلاغ. شكرًا لمساعدتنا في تحسين البنك.', category: 'نوع المشكلة', message: 'التفاصيل (اختياري)', placeholder: 'صف المشكلة باختصار…', noPatient: 'يرجى عدم تضمين معلومات مريض أو معلومات شخصية.', submit: 'إرسال البلاغ', cancel: 'إلغاء', ratingError: 'تعذر حفظ التقييم.', reportError: 'تعذر إرسال البلاغ.', categories: { incorrect_answer: 'إجابة أو شرح غير صحيح', typo: 'خطأ مطبعي', unclear: 'صياغة غير واضحة', outdated: 'معلومة قديمة', other: 'أخرى' } },
+    he: { rate: 'עד כמה השאלה הייתה מועילה?', rated: 'תודה על דירוג השאלה.', report: 'דיווח על בעיה', reportSent: 'הדיווח נשלח. תודה על העזרה בשיפור המאגר.', category: 'סוג הבעיה', message: 'פרטים (לא חובה)', placeholder: 'תארו את הבעיה בקצרה…', noPatient: 'אין לכלול מידע על מטופלים או מידע אישי.', submit: 'שליחת דיווח', cancel: 'ביטול', ratingError: 'לא ניתן לשמור את הדירוג.', reportError: 'לא ניתן לשלוח את הדיווח.', categories: { incorrect_answer: 'תשובה או הסבר שגויים', typo: 'שגיאת כתיב', unclear: 'ניסוח לא ברור', outdated: 'מידע לא מעודכן', other: 'אחר' } },
+    ru: { rate: 'Насколько полезен этот вопрос?', rated: 'Спасибо за оценку.', report: 'Сообщить о проблеме', reportSent: 'Сообщение отправлено. Спасибо за помощь.', category: 'Тип проблемы', message: 'Подробности (необязательно)', placeholder: 'Кратко опишите проблему…', noPatient: 'Не указывайте данные пациентов или личную информацию.', submit: 'Отправить', cancel: 'Отмена', ratingError: 'Не удалось сохранить оценку.', reportError: 'Не удалось отправить сообщение.', categories: { incorrect_answer: 'Неверный ответ или объяснение', typo: 'Опечатка', unclear: 'Непонятная формулировка', outdated: 'Устаревшая информация', other: 'Другое' } },
+  }[locale] ?? { rate: 'How useful was this question?', rated: 'Thanks for rating this question.', report: 'Report a problem', reportSent: 'Report submitted. Thank you for helping improve the bank.', category: 'Problem type', message: 'Details (optional)', placeholder: 'Describe the problem briefly…', noPatient: 'Please do not include patient or personal information.', submit: 'Send report', cancel: 'Cancel', ratingError: 'Could not save your rating.', reportError: 'Could not submit your report.', categories: { incorrect_answer: 'Incorrect answer or explanation', typo: 'Typo', unclear: 'Unclear wording', outdated: 'Outdated information', other: 'Other' } };
 
   useEffect(() => {
     const questionId = state?.question?.id;
@@ -393,6 +413,50 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       .catch((cause) => { if (current) setAnnotationError(cause instanceof Error ? cause.message : annotationCopy.loadError); });
     return () => { current = false; };
   }, [annotationCopy.loadError, state?.question?.id]);
+
+  useEffect(() => {
+    const questionId = state?.question?.id;
+    if (!questionId) return;
+    let current = true;
+    void fetch(`/api/qbank/ratings?questionId=${encodeURIComponent(questionId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const body = await readJson<{ rating: number | null }>(response);
+        if (response.ok && current) setQuestionRating(body.rating);
+      })
+      .catch(() => { /* Rating is optional; the question remains usable if it cannot load. */ });
+    return () => { current = false; };
+  }, [state?.question?.id]);
+
+  async function saveQuestionRating(value: number) {
+    if (!question || ratingBusy) return;
+    setRatingBusy(true);
+    setFeedbackMessage('');
+    try {
+      const response = await fetch('/api/qbank/ratings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ questionId: question.id, rating: value }) });
+      if (!response.ok) throw new Error(feedbackCopy.ratingError);
+      setQuestionRating(value);
+      setFeedbackMessage(feedbackCopy.rated);
+    } catch (cause) {
+      setFeedbackMessage(cause instanceof Error ? cause.message : feedbackCopy.ratingError);
+    } finally { setRatingBusy(false); }
+  }
+
+  async function submitQuestionReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!question || reportBusy) return;
+    setReportBusy(true);
+    setFeedbackMessage('');
+    try {
+      const response = await fetch('/api/qbank/reports', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ questionId: question.id, category: reportCategory, message: reportMessage }) });
+      if (!response.ok) throw new Error(feedbackCopy.reportError);
+      setReportSubmitted(true);
+      setReportOpen(false);
+      setReportMessage('');
+      setFeedbackMessage(feedbackCopy.reportSent);
+    } catch (cause) {
+      setFeedbackMessage(cause instanceof Error ? cause.message : feedbackCopy.reportError);
+    } finally { setReportBusy(false); }
+  }
 
   const media = useMemo(() => [...(state?.question?.media ?? [])].sort((a, b) => a.position - b.position), [state?.question?.media]);
 
@@ -551,6 +615,17 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
               </div>}
               {annotationError && <p className="qbank-annotation-error" role="status">{annotationError}</p>}
             </section>
+            {hasAnswered && <section className="qbank-feedback" aria-label={feedbackCopy.rate}>
+              <div className="qbank-rating-control"><span className="panel-title">{feedbackCopy.rate}</span><div className="qbank-rating-buttons" role="group" aria-label={feedbackCopy.rate}>{([1,2,3,4,5] as const).map((value) => <button key={value} className={`btn btn-sm${questionRating === value ? ' btn-primary' : ''}`} type="button" aria-label={`${value} / 5`} aria-pressed={questionRating === value} disabled={ratingBusy} onClick={() => void saveQuestionRating(value)}>{value}</button>)}</div></div>
+              <button className="btn" type="button" disabled={reportSubmitted} onClick={() => setReportOpen((open) => !open)}>{reportSubmitted ? feedbackCopy.reportSent : feedbackCopy.report}</button>
+              {feedbackMessage && <p className="qbank-feedback-message" role="status">{feedbackMessage}</p>}
+              {reportOpen && <form className="qbank-report-form" onSubmit={(event) => void submitQuestionReport(event)}>
+                <label className="field"><span>{feedbackCopy.category}</span><select value={reportCategory} onChange={(event) => setReportCategory(event.target.value as IssueCategory)}>{(['incorrect_answer','typo','unclear','outdated','other'] as const).map((category) => <option key={category} value={category}>{feedbackCopy.categories[category]}</option>)}</select></label>
+                <label className="field"><span>{feedbackCopy.message}</span><textarea maxLength={2000} rows={3} value={reportMessage} onChange={(event) => setReportMessage(event.target.value)} placeholder={feedbackCopy.placeholder}/></label>
+                <small className="field-note">{feedbackCopy.noPatient}</small>
+                <div className="qbank-feedback-actions"><button className="btn btn-primary" type="submit" disabled={reportBusy}>{reportBusy ? m.common.loading : feedbackCopy.submit}</button><button className="btn" type="button" disabled={reportBusy} onClick={() => setReportOpen(false)}>{feedbackCopy.cancel}</button></div>
+              </form>}
+            </section>}
             <textarea aria-label={m.qbank.note} value={note} onChange={(event) => setNote(event.target.value)} placeholder={m.qbank.notePlaceholder} />
             <div className="qbank-tool-row">
               <button className={`btn${flashcardStatus === 'saved' ? ' btn-primary' : ''}`} disabled={flashcardStatus === 'saving' || flashcardStatus === 'saved'} onClick={() => void createFlashcardFromQuestion()} type="button">{flashcardStatus === 'saving' ? m.common.loading : flashcardStatus === 'saved' ? m.common.saved : m.qbank.addToFlashcards}</button>

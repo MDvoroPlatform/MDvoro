@@ -33,6 +33,19 @@ begin
     if has_table_privilege('anon','public.question_annotations','SELECT') then raise exception 'anon can read private question annotations'; end if;
     if pg_get_functiondef('public.consume_rate_limit(text,integer,integer)'::regprocedure) not ilike '%qbank_annotation%' then raise exception 'annotation rate limit action missing'; end if;
   end if;
+  if to_regclass('public.qbank_question_ratings') is not null then
+    select relrowsecurity into v from pg_class where oid='public.qbank_question_ratings'::regclass;
+    if not v then raise exception 'QBank ratings RLS is disabled'; end if;
+    if has_table_privilege('anon','public.qbank_question_ratings','SELECT') then raise exception 'anon can read private QBank ratings'; end if;
+  end if;
+  if to_regclass('public.qbank_question_reports') is not null then
+    select relrowsecurity into v from pg_class where oid='public.qbank_question_reports'::regclass;
+    if not v then raise exception 'QBank report RLS is disabled'; end if;
+    if has_table_privilege('anon','public.qbank_question_reports','SELECT') then raise exception 'anon can read private QBank reports'; end if;
+    if not has_function_privilege('authenticated','public.admin_list_qbank_question_reports(text,integer)','EXECUTE') then raise exception 'admin QBank report queue RPC missing'; end if;
+    if not has_function_privilege('authenticated','public.admin_update_qbank_question_report(uuid,text,text)','EXECUTE') then raise exception 'admin QBank report update RPC missing'; end if;
+    if pg_get_functiondef('public.consume_rate_limit(text,integer,integer)'::regprocedure) not ilike '%qbank_feedback%' then raise exception 'QBank feedback rate limit action missing'; end if;
+  end if;
 end $$;
 
 -- Every SECURITY DEFINER function in public must pin an empty search_path.

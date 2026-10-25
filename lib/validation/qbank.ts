@@ -1,4 +1,15 @@
 import { z } from 'zod';
+export const qbankQuestionRatingSchema = z.object({ questionId: z.string().uuid(), rating: z.number().int().min(1).max(5) });
+export const qbankQuestionReportSchema = z.object({
+  questionId: z.string().uuid(),
+  category: z.enum(['incorrect_answer','typo','unclear','outdated','other']),
+  message: z.string().trim().max(2000).default(''),
+});
+export const adminQbankQuestionReportUpdateSchema = z.object({
+  reportId: z.string().uuid(),
+  status: z.enum(['open','in_review','resolved','dismissed']),
+  note: z.string().trim().max(2000).default(''),
+});
 export const startSessionSchema = z.object({
   examId: z.string().uuid(),
   subjects: z.array(z.string().trim().min(1).max(120)).max(20).default([]),
