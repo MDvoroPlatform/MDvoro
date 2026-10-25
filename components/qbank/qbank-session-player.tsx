@@ -194,7 +194,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         const wallElapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
         const pausedNow = state.session.on_break && state.session.break_started_at
           ? Math.max(0, Math.floor((Date.now() - new Date(state.session.break_started_at).getTime()) / 1000)) : 0;
-        setElapsedSeconds(Math.max(0, wallElapsed - state.session.practice_paused_seconds - pausedNow));
+        setElapsedSeconds(Math.max(0, wallElapsed - (state.session.practice_paused_seconds ?? 0) - pausedNow));
       };
       tick();
       if (state.session.on_break) return;
