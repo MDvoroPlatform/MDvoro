@@ -1,0 +1,81 @@
+name: MDvoro Anatomy Lab release backup
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tools/anatomy/prepare-mdvoro-release.mjs'
+      - '.github/workflows/anatomy-lab-backup.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout MDvoro tooling
+        uses: actions/checkout@v4
+
+      - name: Checkout the original anatomy project
+        uses: actions/checkout@v4
+        with:
+          repository: slorksmo/Human-Atlas
+          ref: 5bb5713aab18d7fe9380c3339eb09f173491ea06
+          path: upstream
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.15.0'
+          cache: npm
+          cache-dependency-path: upstream/package-lock.json
+
+      - name: Prepare the MDvoro-branded release
+        run: node tools/anatomy/prepare-mdvoro-release.mjs upstream release/MDvoro-Anatomy-Lab
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: release/MDvoro-Anatomy-Lab
+
+      - name: TypeScript check
+        run: npm run check
+        working-directory: release/MDvoro-Anatomy-Lab
+
+      - name: Validate male atlas
+        run: node scripts/validate-atlas.mjs
+        working-directory: release/MDvoro-Anatomy-Lab
+
+      - name: Validate female atlas
+        run: node scripts/validate-atlas.mjs atlas-female.json
+        working-directory: release/MDvoro-Anatomy-Lab
+
+      - name: Validate interactions
+        run: node scripts/validate-interactions.mjs
+        working-directory: release/MDvoro-Anatomy-Lab
+
+      - name: Production build
+        run: npm run build
+        working-directory: release/MDvoro-Anatomy-Lab
+
+      - name: Package source, data, and production build
+        run: |
+          cd release
+          zip -qr ../MDvoro-Anatomy-Lab-backup.zip MDvoro-Anatomy-Lab
+          sha256sum ../MDvoro-Anatomy-Lab-backup.zip > ../MDvoro-Anatomy-Lab-backup.sha256
+          cd ..
+          mv MDvoro-Anatomy-Lab-backup.sha256 release/MDvoro-Anatomy-Lab-backup.sha256
+
+      - name: Upload ZIP backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: MDvoro-Anatomy-Lab-backup
+          path: |
+            MDvoro-Anatomy-Lab-backup.zip
+            release/MDvoro-Anatomy-Lab-backup.sha256
+          if-no-files-found: error
+          retention-days: 90
