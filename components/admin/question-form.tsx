@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MediaPicker } from '@/components/admin/media-picker';
+import { QuestionVersionHistory, type QuestionVersion } from '@/components/admin/question-version-history';
 type Exam = {
     id: string;
     code: string;
@@ -56,12 +57,13 @@ type Initial = {
     rightsBasis?: 'original' | 'licensed' | 'permission' | 'public_domain' | 'user_submitted' | 'unknown';
 };
 const emptyOptions = ['A', 'B', 'C', 'D', 'E'].map((id) => ({ id, text: '' }));
-export function QuestionForm({ exams, media, initial, canReview, canEdit = true, canPublishDirect = false, taxonomy = [], qbankTaxonomy = [], selectedTaxonomyIds = [], }: {
+export function QuestionForm({ exams, media, initial, canReview, canEdit = true, canPublishDirect = false, taxonomy = [], qbankTaxonomy = [], selectedTaxonomyIds = [], versions = [], }: {
     exams: Exam[];
     media: Media[];
     taxonomy?: Taxonomy[];
     qbankTaxonomy?: QBankTaxonomyNode[];
     selectedTaxonomyIds?: string[];
+    versions?: QuestionVersion[];
     initial?: Initial;
     canReview?: boolean;
     canEdit?: boolean;
@@ -111,13 +113,7 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
         const completedOptions = form.options.filter((option) => option.text.trim());
         const invalidField = !form.examId ? 'exam' : !form.subject.trim() ? 'subject' : form.stem.trim().length < 10 ? 'stem' : completedOptions.length < 2 ? 'options' : !completedOptions.some((option) => option.id === form.answerKey) ? 'answer' : null;
         if (invalidField) {
-            const validationMessages: Record<string, string> = {
-                exam: 'Choose an exam before saving.',
-                subject: 'Add a subject before saving.',
-                stem: 'Write at least 10 characters in the question text.',
-                options: 'Add text to at least two answer options.',
-                answer: 'Add text to the option marked as correct.',
-            };
+            const validationMessages: Record<string, string> = { exam: 'Choose an exam before saving.', subject: 'Add a subject before saving.', stem: 'Write at least 10 characters in the question text.', options: 'Add text to at least two answer options.', answer: 'Add text to the option marked as correct.' };
             setMessage(validationMessages[invalidField]);
             const target = document.querySelector<HTMLElement>(`[data-question-field="${invalidField}"]`);
             target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -126,63 +122,32 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
         }
         setBusy(true);
         setMessage('');
-        const endpoint = form.id ? '/api/admin/questions/update' : '/api/admin/questions';
-        const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, options: form.options.filter((option) => option.text.trim()), difficulty: form.difficulty ?? 3 }) });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            setMessage(body.error === 'invalid_request' ? 'Check the highlighted required fields.' : 'Could not save this draft.');
-            setBusy(false);
-            return;
-        }
-        const savedQuestionId = form.id || body.id;
-        if (savedQuestionId) update({ id: savedQuestionId, workflowStatus: 'draft' });
-        setMessage('Saved as draft.');
-        let relatedUpdatesSucceeded = true;
-        if (body.id || form.id) {
-            const questionId = savedQuestionId;
+        try {
             const linkedTopicId = topicsForSubject.find((node) => [node.name, ...node.aliases].some((name) => normalize(name) === normalize(form.topic)))?.id;
             const taxonomyIds = [...new Set([...selectedTaxonomy.filter((id) => !qbankTopics.some((node) => node.id === id)), ...(linkedTopicId ? [linkedTopicId] : [])])];
-            const taxonomyResponse = await fetch('/api/admin/questions/taxonomy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId, taxonomyIds }) });
-            if (!taxonomyResponse.ok) {
-                relatedUpdatesSucceeded = false;
-                setMessage('Draft saved, but taxonomy could not be updated.');
+            const response = await fetch('/api/admin/questions/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, options: completedOptions, difficulty: form.difficulty ?? 3, taxonomyIds, publishNow }) });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok || !body.id) {
+                const errors: Record<string, string> = {
+                    invalid_request: 'Check the highlighted required fields.',
+                    forbidden: 'Your account does not have permission to save this question.',
+                    admin_required_for_published_question_edit: 'Only an Admin can edit a published question.',
+                    reconstruction_year_required: 'Choose a valid reconstruction year before saving.',
+                    taxonomy_not_found: 'One of the selected taxonomy items no longer exists. Refresh and try again.',
+                    save_failed: 'Could not save this question. No changes were applied.',
+                };
+                setMessage(errors[body.error] ?? 'Could not save this question. No changes were applied.');
+                return;
             }
+            update({ id: body.id, workflowStatus: body.workflowStatus ?? (publishNow ? 'published' : 'draft') });
+            setMessage(publishNow ? 'Published directly without independent medical review.' : body.isPublished ? 'Changes saved. The question remains published.' : 'Saved as draft.');
+            router.refresh();
+            if (!form.id) router.push(`/admin/questions/${body.id}`);
+        } catch {
+            setMessage('Could not save this question. Check your connection and try again.');
+        } finally {
+            setBusy(false);
         }
-        if (body.id || form.id) {
-            const questionId = savedQuestionId;
-            const keyTermsResponse = await fetch('/api/admin/questions/key-terms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId, terms: form.keyTerms ?? [] }) });
-            if (!keyTermsResponse.ok) {
-                relatedUpdatesSucceeded = false;
-                setMessage('Draft saved, but key terms could not be updated.');
-            }
-            const reconstructionResponse = await fetch('/api/admin/questions/reconstruction', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId, isReconstruction: Boolean(form.isReconstruction), reconstructionYear: form.reconstructionYear ?? null, reconstructionLabel: form.reconstructionLabel ?? 'שחזור' }) });
-            if (!reconstructionResponse.ok) {
-                relatedUpdatesSucceeded = false;
-                setMessage('Draft saved, but reconstruction labeling could not be updated.');
-            }
-            const rightsResponse = await fetch('/api/admin/questions/rights', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId, rightsBasis: form.rightsBasis ?? 'unknown', sourceReference: form.sourceReference ?? '' }) });
-            if (!rightsResponse.ok) {
-                relatedUpdatesSucceeded = false;
-                setMessage('Draft saved, but the source and image rights details could not be saved.');
-            }
-        }
-        if (publishNow && canPublishDirect && relatedUpdatesSucceeded && savedQuestionId) {
-            const publishResponse = await fetch('/api/admin/questions/publish', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ questionId: savedQuestionId }),
-            });
-            if (publishResponse.ok) {
-                update({ workflowStatus: 'published' });
-                setMessage('Published directly. No independent medical review was performed.');
-            } else {
-                setMessage('Saved as a draft, but direct publishing failed. Please try again.');
-            }
-        }
-        router.refresh();
-        if (!form.id && body.id)
-            router.push(`/admin/questions/${body.id}`);
-        setBusy(false);
     }
     async function submitForReview() {
         if (!form.id)
@@ -199,6 +164,22 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
         setMessage('Sent to the medical review queue.');
         router.refresh();
         setBusy(false);
+    }
+    async function unpublish() {
+        if (!form.id || !window.confirm('Unpublish this question? Students will no longer see it in new sessions.')) return;
+        setBusy(true);
+        setMessage('');
+        try {
+            const response = await fetch('/api/admin/questions/unpublish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questionId: form.id }) });
+            if (!response.ok) throw new Error('unpublish_failed');
+            update({ workflowStatus: 'draft' });
+            setMessage('Question unpublished.');
+            router.refresh();
+        } catch {
+            setMessage('Could not unpublish this question.');
+        } finally {
+            setBusy(false);
+        }
     }
     async function review(decision: 'approved' | 'changes_requested' | 'rejected') {
         if (!form.id)
@@ -262,8 +243,9 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
       <div className="form-section"><div className="section-title">Answer options</div><p className="form-hint">Enter at least two choices, then select the radio button beside the correct answer.</p><div className="options-editor">{form.options.map((option) => <div className="option-row" key={option.id}><b>{option.id}</b><input data-question-field={option.id === form.answerKey ? 'answer' : undefined} disabled={!canEdit} value={option.text} onChange={(e) => updateOption(option.id, e.target.value)} placeholder={`Answer choice ${option.id}`} aria-label={`Answer option ${option.id}`}/><label className="correct-answer"><input disabled={!canEdit} className="radio" type="radio" name="answer" checked={form.answerKey === option.id} onChange={() => update({ answerKey: option.id })} aria-label={`Mark option ${option.id} correct`}/><span>Correct answer</span></label>{canEdit && form.options.length > 2 && <button className="btn option-remove" type="button" onClick={() => removeOption(option.id)} aria-label={`Remove option ${option.id}`}>Remove</button>}</div>)}</div>{canEdit && form.options.length < 10 && <button className="btn option-add" type="button" onClick={addOption}>+ Add option</button>}</div>
       <div className="form-section"><div className="section-title">Medical explanation</div><label className="field"><span>Explanation</span><textarea disabled={!canEdit} rows={9} value={form.explanation} onChange={(e) => update({ explanation: e.target.value })} placeholder="Explain why the correct answer is correct and address important alternatives…"/></label><label className="field"><span>Key learning point</span><textarea disabled={!canEdit} rows={3} value={form.keyLearningPoint} onChange={(e) => update({ keyLearningPoint: e.target.value })} placeholder="One high-yield takeaway…"/></label></div>
       <div className="form-actions">
-        {canEdit && <button className="btn" disabled={busy} onClick={() => save(false)}>{busy ? 'Saving…' : 'Save draft'}</button>}
-        {canEdit && canPublishDirect && <button className="btn btn-primary" disabled={busy} onClick={() => save(true)}>{busy ? 'Saving…' : 'Publish question'}</button>}
+        {canEdit && <button className="btn" disabled={busy} onClick={() => save(false)}>{busy ? 'Saving…' : status === 'published' ? 'Save changes' : 'Save draft'}</button>}
+        {canEdit && canPublishDirect && status !== 'published' && <button className="btn btn-primary" disabled={busy} onClick={() => save(true)}>{busy ? 'Saving…' : 'Publish question'}</button>}
+        {canEdit && canPublishDirect && form.id && status === 'published' && <button className="btn" disabled={busy} onClick={unpublish}>Unpublish question</button>}
         {canEdit && form.id && status === 'draft' && <button className="btn" disabled={busy} onClick={submitForReview}>Send for medical review</button>}
         {form.id && canReview && status === 'in_review' && <><button className="btn btn-primary" disabled={busy} onClick={() => review('approved')}>Approve & publish</button><button className="btn" disabled={busy} onClick={() => review('changes_requested')}>Request changes</button></>}
         {canEdit && form.id && <button className="btn" disabled={busy} onClick={duplicate}>Duplicate</button>}
@@ -275,6 +257,7 @@ export function QuestionForm({ exams, media, initial, canReview, canEdit = true,
       <section className="card card-pad question-live-preview"><div className="panel-title">Live preview</div><p className="preview-stem">{form.stem.trim() || 'Your question will appear here as you write.'}</p><ol type="A">{form.options.filter((option) => option.text.trim()).map((option) => <li key={option.id}>{option.text}{option.id === form.answerKey ? <span className="preview-correct">Correct answer</span> : null}</li>)}</ol>{form.explanation.trim() && <div className="preview-explanation"><strong>Explanation</strong><p>{form.explanation}</p></div>}</section>
       <section className="card card-pad"><div className="panel-title">Quick tips</div><ul className="authoring-tips"><li>Keep the question focused on one learning objective.</li><li>Make answer choices clear and mutually distinct.</li><li>Mark one correct answer and explain why.</li><li>Use images only when they add useful clinical context.</li><li>Check image usage rights before publishing.</li></ul><a className="btn" href="/admin/media">Open media library</a></section>
       <section className="card card-pad"><div className="panel-title">Publishing</div><div className="security-note">{canPublishDirect ? 'Admin publishing is immediate and does not require independent medical review. Each change is versioned and audited.' : 'Answers stay behind the server boundary. Editors can submit drafts to the review queue.'}</div></section>
+      {form.id && <QuestionVersionHistory questionId={form.id} versions={versions} canRestore={canPublishDirect}/>}
       <section className="card card-pad admin-authoring-checklist"><div className="panel-head"><div><div className="panel-title">Authoring checklist</div><div className="panel-sub">Completeness guidance only; it does not verify medical accuracy.</div></div></div><ul>{qualityChecks.map(([label, complete])=><li key={label} className={complete ? 'is-complete' : ''}><span aria-hidden="true">{complete ? '✓' : '○'}</span>{label}</li>)}</ul><div className="authoring-checklist-note">{form.mediaIds.length ? `${form.mediaIds.length} reusable media item${form.mediaIds.length === 1 ? '' : 's'} attached.` : 'Add reusable images or diagrams when the question needs them.'}</div></section>
     </aside>
   </div>;

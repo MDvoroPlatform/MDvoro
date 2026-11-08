@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { requireSuperAdmin } from '@/lib/server/authorization';
+import { requireAdmin } from '@/lib/server/authorization';
 import { assertMutationRequest, readJson, rejectOversizedJson } from '@/lib/server/api';
 import { z } from 'zod';
 
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const oversized = rejectOversizedJson(request, 4096);
   if (oversized) return oversized;
   try {
-    const { supabase } = await requireSuperAdmin();
+        const { supabase } = await requireAdmin();
     const body = schema.parse(await readJson(request));
     const { error } = await supabase.rpc('admin_set_under_construction', { p_enabled: body.enabled });
     if (error) return NextResponse.json({ error: 'update_failed' }, { status: 400 });

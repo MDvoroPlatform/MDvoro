@@ -13,7 +13,7 @@ type Counts = {
 };
 export default async function AdminOverview() {
     const { supabase, user, role } = await requireStaff();
-    const canManageUsers = role === 'admin' || role === 'super_admin';
+    const canManageUsers = role === 'admin';
     const [{ data: counts, error: countsError }, { data: recent, error: recentError }, { data: ops, error: opsError }, { data: auditEvents }] = await Promise.all([
         supabase.rpc('admin_content_counts'),
         supabase.rpc('admin_list_questions', { p_limit: 100, p_offset: 0 }),

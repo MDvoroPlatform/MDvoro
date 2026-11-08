@@ -14,7 +14,7 @@ export async function AppShell({ children, userName, role }: {
     role?: string | null;
 }) {
     const { messages: m } = await getI18n();
-    const staff = ['super_admin', 'admin', 'editor', 'reviewer', 'support'].includes(role ?? '');
+    const staff = ['admin', 'editor', 'reviewer', 'support'].includes(role ?? '');
     return (<div className="shell">
       <aside className="sidebar" aria-label={m.nav.dashboard}>
         <HomeLogoLink className="brand brand-image">

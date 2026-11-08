@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireSuperAdmin } from '@/lib/server/authorization';
+import { requireAdmin } from '@/lib/server/authorization';
 import { apiError, assertMutationRequest, readJson, enforceRateLimit } from '@/lib/server/api';
 
 const schema = z.object({
@@ -24,7 +24,7 @@ const schema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const { supabase } = await requireSuperAdmin();
+    const { supabase } = await requireAdmin();
     const examId = new URL(request.url).searchParams.get('examId');
     if (!examId) return NextResponse.json({ error: 'exam_id_required' }, { status: 400 });
     const parsed = z.string().uuid().parse(examId);
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   const blocked = assertMutationRequest(request);
   if (blocked) return blocked;
   try {
-    const { supabase } = await requireSuperAdmin();
+    const { supabase } = await requireAdmin();
     await enforceRateLimit(supabase, 'admin_write', 30, 60);
     const input = schema.parse(await readJson(request));
     const { error } = await supabase.rpc('admin_update_exam_profile', {
