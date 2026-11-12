@@ -7,7 +7,8 @@ export function TeamRoleEditor({ userId, name, role, currentUserId }: {
     role: string;
     currentUserId: string;
 }) {
-    const [value, setValue] = useState<Role>((role in ROLE_LABELS ? role : 'student') as Role);
+    const normalizedRole = role === 'super_admin' ? 'admin' : role;
+    const [value, setValue] = useState<Role>((normalizedRole in ROLE_LABELS ? normalizedRole : 'student') as Role);
     const [message, setMessage] = useState('');
     const [busy, setBusy] = useState(false);
     async function save() {
@@ -18,6 +19,6 @@ export function TeamRoleEditor({ userId, name, role, currentUserId }: {
         setMessage(response.ok ? 'Saved' : body.error === 'last_admin_protected' ? 'Last admin protected' : 'Failed');
         setBusy(false);
     }
-    return <tr><td><div className="table-title">{name}</div><small>{userId}</small></td><td><span className="status status-published">{ROLE_LABELS[value]}</span></td><td>—</td><td><div className="role-editor"><select value={value} disabled={userId === currentUserId} onChange={(e) => setValue(e.target.value as Role)}>{(Object.keys(ROLE_LABELS) as Role[]).filter((item) => item !== 'super_admin').map((item) => <option key={item} value={item}>{ROLE_LABELS[item]}</option>)}</select><small>{ROLE_HELP[value]}</small><button className="btn" disabled={busy || value === role || userId === currentUserId} onClick={save}>{busy ? 'Saving…' : 'Apply'}</button>{message && <small>{message}</small>}</div></td></tr>;
+    return <tr><td><div className="table-title">{name}</div><small>{userId}</small></td><td><span className="status status-published">{ROLE_LABELS[value]}</span></td><td>—</td><td><div className="role-editor"><select value={value} disabled={userId === currentUserId} onChange={(e) => setValue(e.target.value as Role)}>{(Object.keys(ROLE_LABELS) as Role[]).map((item) => <option key={item} value={item}>{ROLE_LABELS[item]}</option>)}</select><small>{ROLE_HELP[value]}</small><button className="btn" disabled={busy || value === normalizedRole || userId === currentUserId} onClick={save}>{busy ? 'Saving…' : 'Apply'}</button>{message && <small>{message}</small>}</div></td></tr>;
 }
 

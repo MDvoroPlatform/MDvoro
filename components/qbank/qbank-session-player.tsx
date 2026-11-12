@@ -1,7 +1,7 @@
 'use client';
 import Image from 'next/image';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n/provider';
@@ -9,6 +9,7 @@ import { AnnotationText, type QuestionAnnotation } from '@/components/qbank/anno
 import { createTextAnchor, type AnnotationAnchor } from '@/lib/qbank/annotation-anchor';
 import { Icon } from '@/components/ui/icons';
 import { LabValuesBrowser, type LabValueRow } from '@/components/library/lab-values-browser';
+import { LatestNavigationRequest, SessionNavigationCache, sessionNavigationCacheTtl } from '@/lib/qbank/session-navigation';
 
 type SessionItem = {
   position: number;
@@ -69,7 +70,7 @@ type SessionState = {
 };
 
 type ApiErrorBody = { error?: string };
-type AnswerResponse = { already_answered?: boolean; is_correct?: boolean; selected_answer?: string | null; error?: string };
+type AnswerResponse = { already_answered?: boolean; is_correct?: boolean; selected_answer?: string | null; correct_answer?: string | null; explanation?: string | null; key_learning_point?: string | null; key_terms?: string[]; error?: string };
 type IssueCategory = 'incorrect_answer' | 'typo' | 'unclear' | 'outdated' | 'other';
 
 function formatTime(totalSeconds: number): string {
@@ -128,6 +129,10 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const [labValues, setLabValues] = useState<LabValueRow[] | null>(null);
   const [labsLoading, setLabsLoading] = useState(false);
   const [labsError, setLabsError] = useState(false);
+  const navigationCache = useRef(new SessionNavigationCache<SessionState>());
+  const navigationRequest = useRef(new LatestNavigationRequest());
+  const navigationController = useRef<AbortController | null>(null);
+  const stateRef = useRef<SessionState | null>(null);
   const timerCopy = ({ en: { elapsed: 'Elapsed', pause: 'Pause', resume: 'Resume', paused: 'Practice paused' }, he: { elapsed: 'זמן שחלף', pause: 'השהה', resume: 'המשך', paused: 'התרגול מושהה' }, ar: { elapsed: 'الوقت المنقضي', pause: 'إيقاف مؤقت', resume: 'استئناف', paused: 'التدريب متوقف مؤقتًا' }, ru: { elapsed: 'Прошло', pause: 'Пауза', resume: 'Продолжить', paused: 'Практика приостановлена' } } as const)[locale];
   const clinicalCopy = ({
     en: { keyInfo: 'Key info', attendingTip: 'Attending tip', labs: 'Labs', reviewAfterAnswer: 'Answer the question to review its explanation and key information.', noTip: 'No attending tip is available for this question.', referenceRanges: 'Approved reference ranges', referenceNote: 'General educational ranges, not values specific to this question. Use the range reported by the testing laboratory.', labsUnavailable: 'Reference ranges could not be loaded.', elapsed: 'Elapsed' },
@@ -145,26 +150,38 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const questionAnnotations = annotations.filter((annotation) => annotation.question_id === state?.question?.id);
   const activeAnnotation = questionAnnotations.find((annotation) => annotation.id === activeAnnotationId) ?? null;
 
-  const load = useCallback(async (position = 0) => {
+  const load = useCallback(async (position = 0, options: { force?: boolean } = {}) => {
+    const requestId = navigationRequest.current.begin();
+    navigationController.current?.abort();
+    const controller = new AbortController();
+    navigationController.current = controller;
     try {
-      const response = await fetch(`/api/qbank/session/${sessionId}/state?position=${position}`, { cache: 'no-store' });
-      const body = await readJson<SessionState & ApiErrorBody>(response);
-      if (!response.ok) {
-        if (body.error === 'session_expired') {
-          await fetch(`/api/qbank/session/${sessionId}/finish`, { method: 'POST' });
-          router.replace(`/qbank/session/${sessionId}/result`);
-          return;
+      const fetchState = async () => {
+        const compact = !options.force && position > 0 && stateRef.current !== null;
+        const url = `/api/qbank/session/${sessionId}/state?position=${position}${compact ? '&compact=1' : ''}`;
+        const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+        const body = await readJson<SessionState & ApiErrorBody>(response);
+        if (!response.ok) {
+          if (body.error === 'session_expired') throw Object.assign(new Error(body.error), { expired: true });
+          if (body.error === 'block_closed') throw new Error(m.qbank.blockClosed);
+          if (body.error === 'block_not_open') throw new Error(m.qbank.blockNotOpen);
+          throw new Error(body.error ?? m.common.error);
         }
-        if (body.error === 'block_closed') throw new Error(m.qbank.blockClosed);
-        if (body.error === 'block_not_open') throw new Error(m.qbank.blockNotOpen);
-        throw new Error(body.error ?? m.common.error);
-      }
-      const nextState = body as SessionState;
+        const next = body as SessionState;
+        const previous = stateRef.current;
+        return { ...next, items: next.items ?? previous?.items ?? [] };
+      };
+      const navigationTtl = stateRef.current ? sessionNavigationCacheTtl(stateRef.current.session) : 0;
+      const nextState = options.force || position === 0 || navigationTtl <= 0
+        ? await fetchState()
+        : await navigationCache.current.getOrLoad(position, fetchState, navigationTtl);
+      if (!navigationRequest.current.isCurrent(requestId)) return;
       setError(null);
       setAnnotations([]);
       setPendingAnnotation(null);
       setActiveAnnotationId(null);
       setAnnotationError('');
+      stateRef.current = nextState;
       setState(nextState);
       setSelected(nextState.question?.selected_answer ?? null);
       setNote(nextState.question?.note ?? '');
@@ -180,10 +197,34 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       setReportMessage('');
       setReportSubmitted(false);
       setFeedbackMessage('');
+      navigationCache.current.delete(position);
+      const prefetchTtl = sessionNavigationCacheTtl(nextState.session);
+      if (prefetchTtl > 0) {
+        const current = nextState.session.current_position;
+        const currentBlock = nextState.session.current_block;
+        const candidates = [current - 1, current + 1].filter((p) => p >= 1 && p <= nextState.session.requested_count)
+          .filter((p) => !nextState.items.length || nextState.items.some((item) => item.position === p && item.block === currentBlock));
+        for (const adjacent of candidates) {
+          void navigationCache.current.getOrLoad(adjacent, async () => {
+            const response = await fetch(`/api/qbank/session/${sessionId}/state?position=${adjacent}&prefetch=1`, { cache: 'no-store' });
+            const body = await readJson<SessionState & ApiErrorBody>(response);
+            if (!response.ok) throw new Error(body.error ?? m.common.error);
+            return { ...(body as SessionState), items: nextState.items };
+          }, prefetchTtl).catch(() => undefined);
+        }
+      }
     } catch (cause) {
+      if (!navigationRequest.current.isCurrent(requestId)) return;
+      if (cause instanceof Error && cause.name === 'AbortError') return;
+      if (cause instanceof Error && 'expired' in cause) {
+        await fetch(`/api/qbank/session/${sessionId}/finish`, { method: 'POST' });
+        router.replace(`/qbank/session/${sessionId}/result`);
+        return;
+      }
       setError(cause instanceof Error ? cause.message : m.common.error);
     } finally {
-      setLoading(false);
+      if (navigationController.current === controller) navigationController.current = null;
+      if (navigationRequest.current.isCurrent(requestId)) setLoading(false);
     }
   }, [m.common.error, m.qbank.blockClosed, m.qbank.blockNotOpen, router, sessionId]);
 
@@ -191,6 +232,8 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
     const timer = window.setTimeout(() => void load(0), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => () => navigationController.current?.abort(), []);
 
   useEffect(() => {
     if (!state) return;
@@ -281,9 +324,34 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       setSaving(false);
       return;
     }
-    await load(currentPosition);
+    if (body.already_answered || typeof body.is_correct !== 'boolean') {
+      navigationCache.current.clear();
+      await load(currentPosition, { force: true });
+    } else if (stateRef.current?.question) {
+      const old = stateRef.current;
+      const oldQuestion = old.question;
+      if (!oldQuestion) { await load(currentPosition, { force: true }); setSaving(false); return; }
+      const updatedItems = old.items.map((item) => item.position === currentPosition ? { ...item, answered: true, correct: body.is_correct! } : item);
+      const updated: SessionState = { ...old, items: updatedItems, question: { ...oldQuestion, answered: true, selected_answer: selected, is_correct: body.is_correct, correct_answer: body.correct_answer ?? null, explanation: body.explanation ?? null, key_learning_point: body.key_learning_point ?? null, key_terms: body.key_terms ?? oldQuestion.key_terms } };
+      stateRef.current = updated;
+      setState(updated);
+      setSelected(selected);
+      setKeyVisible(true);
+      setFeedbackMessage('');
+      navigationCache.current.clear();
+      const nextPosition = currentPosition + 1;
+      const cacheTtl = sessionNavigationCacheTtl(updated.session);
+      if (cacheTtl > 0 && nextPosition <= updated.session.requested_count && updated.items.some((item) => item.position === nextPosition && item.block === updated.session.current_block)) {
+        void navigationCache.current.getOrLoad(nextPosition, async () => {
+          const response = await fetch(`/api/qbank/session/${sessionId}/state?position=${nextPosition}&prefetch=1`, { cache: 'no-store' });
+          const next = await readJson<SessionState & ApiErrorBody>(response);
+          if (!response.ok) throw new Error(next.error ?? m.common.error);
+          return { ...(next as SessionState), items: updatedItems };
+        }, cacheTtl).catch(() => undefined);
+      }
+    }
     setSaving(false);
-  }, [confidence, currentPosition, load, m.qbank.blockClosed, m.qbank.blockNotOpen, m.qbank.couldNotRecord, m.qbank.sessionExpired, questionStartedAt, saving, selected, sessionId, state]);
+  }, [confidence, currentPosition, load, m.common.error, m.qbank.blockClosed, m.qbank.blockNotOpen, m.qbank.couldNotRecord, m.qbank.sessionExpired, questionStartedAt, saving, selected, sessionId, state]);
 
   async function createFlashcardFromQuestion() {
     const question = state?.question;
@@ -317,7 +385,8 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       });
       const body = await readJson<ApiErrorBody>(response);
       if (!response.ok) throw new Error(body.error ?? m.qbank.stateFailed);
-      await load(currentPosition);
+      navigationCache.current.clear();
+      await load(currentPosition, { force: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : m.qbank.stateFailed);
     } finally {
@@ -348,6 +417,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       const body = await readJson<ApiErrorBody>(response);
       if (!response.ok) throw new Error(body.error ?? m.qbank.stateFailed);
       setIsSaved(!isSaved);
+      navigationCache.current.clear();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : m.qbank.stateFailed);
     } finally { setBookmarkBusy(false); }
@@ -361,7 +431,8 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       const response = await fetch(`/api/qbank/session/${sessionId}/break/start`, { method: 'POST' });
       const body = await readJson<ApiErrorBody>(response);
       if (!response.ok) throw new Error(body.error ?? m.qbank.breakUnavailable);
-      await load(currentPosition);
+      navigationCache.current.clear();
+      await load(currentPosition, { force: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : m.qbank.breakUnavailable);
     } finally {
@@ -378,7 +449,8 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
       const body = await readJson<ApiErrorBody>(response);
       if (!response.ok) throw new Error(body.error ?? m.qbank.couldNotResume);
       const nextPosition = state.items.find((item) => item.block === state.session.current_block)?.position ?? currentPosition;
-      await load(nextPosition);
+      navigationCache.current.clear();
+      await load(nextPosition, { force: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : m.qbank.couldNotResume);
     } finally {
@@ -396,7 +468,8 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
         body: JSON.stringify({ action: state.session.on_break ? 'resume' : 'pause' }),
       });
       if (!response.ok) throw new Error(timerCopy.resume);
-      await load(currentPosition);
+      navigationCache.current.clear();
+      await load(currentPosition, { force: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : timerCopy.resume);
     } finally { setBreakBusy(false); }
@@ -576,6 +649,7 @@ export function QBankSessionPlayer({ sessionId }: { sessionId: string }) {
   const media = useMemo(() => [...(state?.question?.media ?? [])].sort((a, b) => a.position - b.position), [state?.question?.media]);
 
   if (loading && !state) return <main className="page-shell"><div className="card card-pad">{m.common.loading}</div></main>;
+  if (!state && loading) return <main className="page-shell"><div className="card card-pad" role="status" aria-live="polite" aria-busy="true">{m.common.loading}</div></main>;
   if (!state) return <main className="page-shell"><div className="card card-pad"><h1>{m.common.error}</h1><p>{error ?? m.qbank.sessionLoadFailed}</p><button className="btn btn-primary" onClick={() => void load(1)}>{m.common.retry}</button></div></main>;
 
   const question = state.question;

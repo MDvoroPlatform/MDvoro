@@ -100,18 +100,26 @@ export function QBankConfigurator({ exams, currentExamId, initialPool, initialEx
     const controller = new AbortController();
     setLoading(true);
     setLoadError(false);
-    Promise.all([
-      fetch('/api/qbank/builder/tree', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(treePayload), signal: controller.signal, cache: 'no-store' }).then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<Tree>; }),
-      fetch(`/api/qbank/catalog?examId=${encodeURIComponent(examId)}`, { signal: controller.signal, cache: 'no-store' }).then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<Catalog>; }),
-    ]).then(([nextTree, nextCatalog]) => {
+    fetch('/api/qbank/builder/tree', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(treePayload), signal: controller.signal, cache: 'no-store' })
+      .then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<Tree>; })
+      .then((nextTree) => {
       setTree(nextTree);
-      setCatalog(nextCatalog);
       setFilters(current => current.questionCount > nextTree.available && nextTree.available > 0 ? { ...current, questionCount: nextTree.available } : current);
     }).catch(error => {
       if (error?.name !== 'AbortError') setLoadError(true);
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [examId, loadedExam, treePayload]);
+
+  useEffect(() => {
+    if (!examId || loadedExam !== examId) return;
+    const controller = new AbortController();
+    fetch(`/api/qbank/catalog?examId=${encodeURIComponent(examId)}`, { signal: controller.signal, cache: 'no-store' })
+      .then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<Catalog>; })
+      .then(setCatalog)
+      .catch(error => { if (error?.name !== 'AbortError') setLoadError(true); });
+    return () => controller.abort();
+  }, [examId, loadedExam]);
 
   const update = (change: Partial<Filters>) => { setMessage(''); setFilters(current => ({ ...current, ...change })); };
   const sourceLeaves = (source: Source) => source.children.length ? source.children.map(child => child.id) : [source.id];

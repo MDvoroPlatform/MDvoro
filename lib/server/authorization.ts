@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import type { User } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
-export const STAFF_ROLES = ['super_admin', 'admin', 'editor', 'reviewer', 'support'] as const;
-export const CONTENT_EDITOR_ROLES = ['super_admin', 'admin', 'editor'] as const;
-export const CONTENT_REVIEWER_ROLES = ['super_admin', 'admin', 'reviewer'] as const;
-export const ADMIN_ROLES = ['super_admin', 'admin'] as const;
+export const STAFF_ROLES = ['admin', 'editor', 'reviewer', 'support'] as const;
+export const CONTENT_EDITOR_ROLES = ['admin', 'editor'] as const;
+export const CONTENT_REVIEWER_ROLES = ['admin', 'reviewer'] as const;
+export const ADMIN_ROLES = ['admin'] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 export type AuthorizedContext = {
     user: User;
@@ -19,7 +19,7 @@ export async function getAuthorizedContext(): Promise<AuthorizedContext | null> 
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
     if (!profile)
         return null;
-    return { user, role: profile.role, supabase };
+    return { user, role: profile.role === 'super_admin' ? 'admin' : profile.role, supabase };
 }
 export async function requireRole(allowed: readonly string[]): Promise<AuthorizedContext> {
     const context = await getAuthorizedContext();
@@ -27,7 +27,7 @@ export async function requireRole(allowed: readonly string[]): Promise<Authorize
         throw new AuthorizationError('unauthorized');
     if (!allowed.includes(context.role))
         throw new AuthorizationError('forbidden');
-    if (context.role === 'admin' || context.role === 'super_admin') {
+    if (context.role === 'admin') {
         const { data, error } = await context.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
         if (error || data.currentLevel !== 'aal2')
             throw new AuthorizationError('mfa_required');
@@ -41,8 +41,3 @@ export const requireStaff = () => requireRole(STAFF_ROLES);
 export const requireContentEditor = () => requireRole(CONTENT_EDITOR_ROLES);
 export const requireContentReviewer = () => requireRole(CONTENT_REVIEWER_ROLES);
 export const requireAdmin = () => requireRole(ADMIN_ROLES);
-
-
-// Backward-compatible alias: admin is the highest product authority; the
-// legacy super_admin role remains equivalent while existing accounts migrate.
-export const requireSuperAdmin = () => requireAdmin();
